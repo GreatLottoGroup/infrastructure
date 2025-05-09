@@ -1,0 +1,18 @@
+crytic-export/
+package-lock.json
+
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+.vscode
+
+# Hardhat files
+cache
+artifacts
+
+#ignition
+ignition/deployments
