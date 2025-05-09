@@ -1,6 +1,6 @@
 {
-  "name": "infrastructure",
-  "version": "1.0.0",
+  "name": "@greatlotto/infrastructure",
+  "version": "0.1.0",
   "description": "Infrastructure of GreatLottoGroup",
   "main": "index.js",
   "scripts": {
