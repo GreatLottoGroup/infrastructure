@@ -8,7 +8,7 @@ const { deploy } = require('../utils/deployTool');
 describe("AccessControlPartnerContract", function() {
 
     // 买家账户
-    const buyerAddress = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+    const buyerAddress = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC';
     const PARTNER_CONTRACT_ROLE = ethers.solidityPackedKeccak256(["string"], ["PARTNER_CONTRACT_ROLE"]);
 
     const InitializeFixture = async () => {
@@ -35,7 +35,7 @@ describe("AccessControlPartnerContract", function() {
     };
 
     beforeEach(async () => {
-        ({greatLottoCoin} = await loadFixture(InitializeFixture));
+        ({greatLottoCoin, daoBenefitPool} = await loadFixture(InitializeFixture));
     });
         
     // grantRole
@@ -48,6 +48,12 @@ describe("AccessControlPartnerContract", function() {
         it("Should revert if new account is not a contract address", async function() {
             await expect(greatLottoCoin.grantRole(PARTNER_CONTRACT_ROLE, buyerAddress)).to.be.revertedWithCustomError(greatLottoCoin, "ErrorInvalidAddress").withArgs(buyerAddress);
         });
+
+        it("Should Grant Role", async function() {
+            await greatLottoCoin.grantRole(PARTNER_CONTRACT_ROLE, daoBenefitPool.address);
+            expect(await greatLottoCoin.hasRole(PARTNER_CONTRACT_ROLE, daoBenefitPool.address)).to.be.true;
+        });
+
     });
     
 });

@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import "../interfaces/IErrorsBase.sol";
 
+import "hardhat/console.sol";
+
 abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
 
     bytes32 public constant PARTNER_CONTRACT_ROLE = keccak256("PARTNER_CONTRACT_ROLE");
@@ -16,6 +18,11 @@ abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
 
     }
 
+    function _isContract(address addr) internal view returns (bool) {
+        uint size = addr.code.length;
+        return size > 1000;
+    }
+
     /**
      * @inheritdoc AccessControl
      */    
@@ -23,7 +30,7 @@ abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
         // 判断地址必须为合约地址
         if(account == address(0)){
             revert ErrorZeroAddress();
-        }else if(account.code.length == 0){
+        }else if(!_isContract(account)){
             revert ErrorInvalidAddress(account);
         }
 
