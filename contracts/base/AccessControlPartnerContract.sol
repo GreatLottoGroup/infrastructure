@@ -2,9 +2,9 @@
 pragma solidity ^0.8.24;
 
 import '@openzeppelin/contracts/access/AccessControl.sol';
-import "../interfaces/IErrors.sol";
+import "../interfaces/IErrorsBase.sol";
 
-abstract contract AccessControlPartnerContract is AccessControl, IErrors{
+abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
 
     bytes32 public constant PARTNER_CONTRACT_ROLE = keccak256("PARTNER_CONTRACT_ROLE");
 

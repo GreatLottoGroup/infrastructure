@@ -73,3 +73,11 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js --network holesky
 npx hardhat ignition verify chain-17000
 
 ```
+
+Publish to NPM
+
+```shell
+
+npm publish --access public
+
+```

@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 /// @title Callback for IUniswapV3PoolActions#mint
 /// @notice Any contract that calls IUniswapV3PoolActions#mint must implement this interface
-interface IErrors {
+interface IErrorsBase {
 
     /**
      * @dev Invalid Amount
