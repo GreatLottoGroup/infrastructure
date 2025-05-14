@@ -12,8 +12,6 @@ async function initContract(contractName, ...args){
 async function deploy(config) {
     let { ownerAddress, coinContractName, ethContractName } = config || {};
 
-    const addr0 = ethers.ZeroAddress;
-
     ownerAddress = ownerAddress || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
     coinContractName = coinContractName || 'GreatLottoCoinTest';
     ethContractName = ethContractName || 'GreatLottoEthTest';
@@ -36,12 +34,10 @@ async function deploy(config) {
     // PartnerTest 初始化
     const partnerTest = await initContract("PartnerTest", greatLottoCoin.address, greatLottoEth.address, daoCoin.address);
 
-    // 设置 GreatLottoCoin caller
     const PARTNER_CONTRACT_ROLE = ethers.solidityPackedKeccak256(["string"], ["PARTNER_CONTRACT_ROLE"]);
 
-    console.log(PARTNER_CONTRACT_ROLE, partnerTest.address);
-
-    await greatLottoCoin.grantRole(PARTNER_CONTRACT_ROLE, partnerTest.address);
+    // 设置 GreatLottoCoin caller
+   await greatLottoCoin.grantRole(PARTNER_CONTRACT_ROLE, partnerTest.address);
     // 设置 GreatLottoEth caller
     await greatLottoEth.grantRole(PARTNER_CONTRACT_ROLE, partnerTest.address);
     // 设置 DaoCoin caller

@@ -44,9 +44,6 @@ describe("BeneficiaryBase", function() {
 
     const benefitTest = async (coin) => {
         let mint = 'mint';
-        if(coin == 'investmentCoin' || coin == 'investmentEth'){
-            mint = 'mintFor';
-        }
         
         // getBeneficiaryList
         it("getBeneficiaryList", async function() {

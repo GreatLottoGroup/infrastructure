@@ -17,6 +17,14 @@ async function main() {
     console.log('"DaoBenefitPoolContractAddress": "%s",', await daoBenefitPool.getAddress());
     console.log('"SalesChannelContractAddress": "%s"', await salesChannel.getAddress());
 
+    console.log('------------');
+    console.log('GREAT_LOTTO_COIN_ADDRESS="%s"', await greatLottoCoin.getAddress());
+    console.log('GREAT_LOTTO_ETH_ADDRESS="%s"', await greatLottoEth.getAddress());
+    console.log('DAO_COIN_ADDRESS="%s"', await daoCoin.getAddress());
+    console.log('DAO_BENEFIT_POOL_ADDRESS="%s"', await daoBenefitPool.getAddress());
+    console.log('SALES_CHANNEL_ADDRESS="%s"', await salesChannel.getAddress());
+    
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere
