@@ -16,3 +16,8 @@ artifacts
 
 #ignition
 ignition/deployments
+.claude/settings.json
+
+# foreign build / lock artifacts (project uses npm + hardhat, not pnpm/next)
+pnpm-lock.yaml
+pnpm-workspace.yaml

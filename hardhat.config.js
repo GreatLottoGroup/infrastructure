@@ -18,8 +18,9 @@ module.exports = {
   defaultNetwork: "hardhat",
   
   solidity: {
-    version: "0.8.24",
+    version: "0.8.35",
     settings: {
+      evmVersion: "cancun",
       optimizer: {
         enabled: false,
         runs: 200
