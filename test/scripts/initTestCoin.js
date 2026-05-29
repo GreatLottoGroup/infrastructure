@@ -16,12 +16,8 @@ async function main() {
         await getCoin.getUSDTCoin(addr, amount);
         // 买入 10000 USDC
         await getCoin.getUSDCCoin(addr, amount);
-        // 买入 10000 DAI
-        await getCoin.getDAICoin(addr, amount);
-        // 买入 1000 WETH
-        await getCoin.getWETHCoin(addr, 1000);
     }
-  
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere

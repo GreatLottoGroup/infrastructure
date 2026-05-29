@@ -21,6 +21,7 @@ module.exports = {
     version: "0.8.35",
     settings: {
       evmVersion: "cancun",
+      viaIR: true,
       optimizer: {
         enabled: false,
         runs: 200

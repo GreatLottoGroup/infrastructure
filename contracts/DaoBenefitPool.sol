@@ -8,11 +8,9 @@ import "./base/BenefitPoolBase.sol";
 // 利润池合约
 contract DaoBenefitPool is BenefitPoolBase{
 
-    constructor(address coinAddr, address ethAddr, address daoCoinAddr) {
+    constructor(address coinAddr, address daoCoinAddr) {
         GreatLottoCoinAddress = coinAddr;
-        GreatLottoEthAddress = ethAddr;
         GovernCoinAddress = daoCoinAddr;
-        GovernEthAddress = daoCoinAddr;
     }
 
 }

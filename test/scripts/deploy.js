@@ -24,10 +24,6 @@ async function main() {
         await contractList.greatLottoCoin.mintFor(addressList[i], parseEther(10 ** 9 + ''));
     }
 
-    for(let i = 0; i < addressList.length; i++){
-        await contractList.greatLottoEth.mintFor(addressList[i], parseEther(10 ** 9 + ''));
-    }
-
 
 }
 

@@ -8,8 +8,8 @@ interface IBenefitPoolBase {
      */
     error BenefitPoolNoBenefit();
 
-    event BenefitExecuted(address indexed executor, bool isEth, uint256 totalBenefitAmount);
+    event BenefitExecuted(address indexed executor, uint256 totalBenefitAmount);
 
-    function executeBenefit(bool isEth, uint256 deadline) external returns (bool);
-    
+    function executeBenefit(uint256 deadline) external returns (bool);
+
 }

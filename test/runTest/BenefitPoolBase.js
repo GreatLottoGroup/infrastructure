@@ -26,7 +26,7 @@ describe("BenefitPoolBase", function() {
     const InitializeFixture = async () => {
         // 合约部署
         let contractList = await deploy();
-        
+
         // 重置时间戳
         await setTimeGap();
 
@@ -37,7 +37,6 @@ describe("BenefitPoolBase", function() {
     }
 
     let greatLottoCoin;
-    let greatLottoEth
     let daoCoin;
     let daoBenefitPool;
 
@@ -57,7 +56,7 @@ describe("BenefitPoolBase", function() {
     let executorDaoBenefitPoolContract;
 
     beforeEach(async () => {
-        ({greatLottoCoin, greatLottoEth, daoCoin, daoBenefitPool} = await loadFixture(InitializeFixture));
+        ({greatLottoCoin, daoCoin, daoBenefitPool} = await loadFixture(InitializeFixture));
         executorDaoBenefitPoolContract = daoBenefitPool.connect(await ethers.getImpersonatedSigner(executeBenefitAddress));
     });
 
@@ -68,9 +67,8 @@ describe("BenefitPoolBase", function() {
         for(let i = 0; i < buyerList.length; i++){
             await govCoinContract[mint](buyerList[i], parseEther(sharesList[i] +''));
         }
-        //console.log('beneficiaryList: ', await govCoinContract.getBeneficiaryList())
     }
- 
+
     let addBenefit = async (coinContract, poolContract, amount) => {
         await coinContract.mintFor(poolContract.address, amount);
     }
@@ -79,13 +77,14 @@ describe("BenefitPoolBase", function() {
     describe("BenefitPool Check", function() {
 
         // 分润池为空
-        let noBenefit = async (executorContract) => {
-            await expect(executorContract.executeBenefit(false, deadline())).to.be.revertedWithCustomError(executorContract, 'BenefitPoolNoBenefit');
-            await expect(executorContract.executeBenefit(true, deadline())).to.be.revertedWithCustomError(executorContract, 'BenefitPoolNoBenefit');
-        }
-
         it("Should revert if no benefit", async function() {
-            await noBenefit(executorDaoBenefitPoolContract)
+            await expect(executorDaoBenefitPoolContract.executeBenefit(deadline())).to.be.revertedWithCustomError(executorDaoBenefitPoolContract, 'BenefitPoolNoBenefit');
+        });
+
+        // 旧 isEth 签名已下线
+        it("Should not have isEth executeBenefit selector", async function() {
+            const fragment = daoBenefitPool.interface.fragments.find(f => f.name === 'executeBenefit' && f.inputs.length === 2);
+            expect(fragment).to.be.undefined;
         });
 
     });
@@ -101,7 +100,6 @@ describe("BenefitPoolBase", function() {
             }
             // poolBalance
             let poolBalanceBefore = await coinContract.balanceOf(poolContract.address);
-            //console.log('poolBalanceBefore: ', poolBalanceBefore);
 
             return [buyerBalanceBefore, poolBalanceBefore]
         }
@@ -113,12 +111,10 @@ describe("BenefitPoolBase", function() {
             let [benefitList, totalBenefitAmount] = await benefitCompute(sharesList, poolAmount, totalSupply, BenefitMinShares);
 
             let [buyerBalanceBefore, poolBalanceBefore] = await checkBefore(coinContract, poolContract);
-            let isEth = coinContract.address == greatLottoEth.address;
-            console.log('isEth: ', isEth);
 
             // 执行分润
-            await expect(executorContract.executeBenefit(isEth, deadline())).to.be.emit(executorContract, 'BenefitExecuted').withArgs(executeBenefitAddress, isEth, totalBenefitAmount);
-            
+            await expect(executorContract.executeBenefit(deadline())).to.be.emit(executorContract, 'BenefitExecuted').withArgs(executeBenefitAddress, totalBenefitAmount);
+
             // 检查
             for(let i = 0; i < buyerList.length; i++){
                 expect(await coinContract.balanceOf(buyerList[i])).to.equal(buyerBalanceBefore[i] + benefitList[i]);
@@ -130,12 +126,7 @@ describe("BenefitPoolBase", function() {
         it("Should executeBenefit by daoBenefitPool coin", async function() {
             await executeBenefit(executorDaoBenefitPoolContract, daoBenefitPool, greatLottoCoin, daoCoin)
         });
-        it("Should executeBenefit by daoBenefitPool eth", async function() {
-            await executeBenefit(executorDaoBenefitPoolContract, daoBenefitPool, greatLottoEth, daoCoin)
-        });
 
     });
 
 });
-
-

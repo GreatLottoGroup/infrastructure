@@ -1,83 +1,81 @@
 # Infrastructure
-Infrastructure of GreatLottoGroup
 
+GreatLottoGroup 平台的底层代币基础设施合约（Hardhat + Solidity 0.8.24 + OpenZeppelin v5）。
+
+## 合约一览
+
+| 合约 | 符号 | 用途 |
+|---|---|---|
+| `GreatLottoCoin` | GLC | ERC20 资产币，与稳定币 1:1 锚定（**仅支持 USDT、USDC**） |
+| `DaoCoin` | GLDC | 治理币（ERC20Votes），按 `coinPrice` 单一定价铸造 |
+| `DaoBenefitPool` | — | 单轨分润池，将 GLC 余额按持仓比例分发给 GLDC 受益人 |
+| `SalesChannel` | — | 销售渠道注册与启用/禁用 |
+
+> **注**：原 `GreatLottoEth` (GLETH) 已下线；`SelfPermit` 仅保留 EIP-2612 标准入口；`_tokens` 白名单中已移除 DAI（详见 `openspec/changes/archive/`）。
+
+## 常用命令
 
 ```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.js
-```
+# 编译
+npx hardhat compile
 
-
- Test
-
-```shell
-npx hardhat node --fork https://eth-mainnet.g.alchemy.com/v2/iyAD5ECTdwibSCZhntMLmhqJnSpNX7eA --fork-block-number 22473100
-
-npx hardhat node --fork https://eth-holesky.g.alchemy.com/v2/iyAD5ECTdwibSCZhntMLmhqJnSpNX7eA --fork-block-number 2360339
-
-
+# 清理
 npx hardhat clean
 
-npx hardhat compile   
+# 测试（默认 fork mainnet，由 hardhat.config.js networks.hardhat.forking 提供）
+npx hardhat test test/runTest/*.js
 
-npx hardhat test --network localhost test/runTest/*.js  
+# 单文件
+npx hardhat test test/runTest/SalesChannel.js
 
+# 覆盖率
 npx hardhat coverage --testfiles "test/runTest/*.js"
-
-npx hardhat run --network localhost test/scripts/deploy.js 
-
-npx hardhat run --network localhost test/scripts/initTestCoin.js   
-
 ```
 
-Deploy check list:
-
-1. run & pass all test case 
-2. check pay token with GreatLottoCoin.sol & GreatLottoEth.sol
-3. check deploy account with hardhat.config.js .env
-4. check owner account with deploy.js & .env
-
-Deploy by Localhost
+如需独立的 fork 节点：
 
 ```shell
+npx hardhat node --fork https://eth-mainnet.g.alchemy.com/v2/<ALCHEMY_API_KEY> --fork-block-number 22473100
+```
 
+## 部署
+
+```shell
+# 本地（hardhat 临时网络）
+npx hardhat ignition deploy ignition/modules/infrastructure.js
+
+# Localhost 节点
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network localhost
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network localhost --reset
 
-npx hardhat run scripts/deploy.js --network localhost
-
-```
-
-Deploy by Sepolia
-
-```shell
-
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network sepolia
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network sepolia --reset
+# Sepolia
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network sepolia --verify
-
 npx hardhat ignition verify chain-11155111
 
+# Mainnet（生产前需将 ignition 模块改为部署 GreatLottoCoin 而非 GreatLottoCoinTest）
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network mainnet --verify
 ```
 
-Deploy by Holesky
+## 部署 Checklist
 
-```shell
+1. 测试用例全绿（`npx hardhat test test/runTest/*.js`）
+2. `GreatLottoCoin._tokens` 中的代币地址匹配目标链（mainnet vs sepolia 注释切换）
+3. `.env` 中 `OWNER_ADDRESS` / `DEPLOY_ACCOUNT_PRIVATE_KEY` 已配置
+4. `ignition/modules/infrastructure.js` 切换为生产合约（默认部署的是 `*Test` 变种）
 
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network holesky --reset
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network holesky --verify
-
-npx hardhat ignition verify chain-17000
+## 环境变量（`.env`）
 
 ```
+ALCHEMY_API_KEY=...
+DEPLOY_ACCOUNT_PRIVATE_KEY=...
+OWNER_ADDRESS=0x...
+ETHERSCAN_API_KEY=...
+```
 
-Publish to NPM
+## NPM 发布
 
 ```shell
-
 npm publish --access public
-
 ```
+
+下游仓库（`GreatLottoCore` / `ScratchCard`）通过 `@greatlotto/infrastructure` 引用本仓库的合约源码与 ABI。

@@ -10,34 +10,16 @@ contract PartnerTest  {
     address public immutable DaoCoinAddress;
     // 资产币地址
     address public immutable GreatLottoCoinAddress;
-    address public immutable GreatLottoEthAddress;
 
-    constructor(address greatLottoCoinAddress, address greatLottoEthAddress, address daoCoinAddress) {
+    constructor(address greatLottoCoinAddress, address daoCoinAddress) {
         DaoCoinAddress = daoCoinAddress;
         GreatLottoCoinAddress = greatLottoCoinAddress;
-        GreatLottoEthAddress = greatLottoEthAddress;
     }
 
     // DaoCoin mintToUser
-    function daoMintToUser(address account, uint256 assets, bool isEth) external returns (bool){
+    function daoMintToUser(address account, uint256 assets) external returns (bool){
         IDaoCoin daoCoin = IDaoCoin(DaoCoinAddress);
-        daoCoin.mintToUser(account, assets, isEth);
-        return true;
-    }
-
-    // GreatLottoEth mint
-    function ethCoinMint(address token, uint256 amount, address payer) external returns (bool){
-        ICoinBase greatLottoEth = ICoinBase(GreatLottoEthAddress);
-        greatLottoEth.mint(token, amount, payer);
-        greatLottoEth.transfer(payer, amount);
-        return true;
-    }
-
-    // GreatLottoEth mint promise
-    function ethCoinMint(address token, uint256 amount, address payer, uint deadline, uint8 v, bytes32 r, bytes32 s) external returns (bool){
-        ICoinBase greatLottoEth = ICoinBase(GreatLottoEthAddress);
-        greatLottoEth.mint(token, amount, payer, deadline, v, r, s);
-        greatLottoEth.transfer(payer, amount);
+        daoCoin.mintToUser(account, assets);
         return true;
     }
 

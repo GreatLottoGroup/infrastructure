@@ -17,10 +17,8 @@ contract DaoCoin is ERC20Votes, ERC20Permit, BeneficiaryBase, AccessControlPartn
 
     // 1$ -> 1 GLDC 每注1个份额
     uint256 public coinPrice = 1 * (10 ** 18);
-    // 0.0005 ETH -> 1 GLDC 每注2个份额
-    uint256 public coinPriceEth = 5 * (10 ** 14);
 
-    constructor(address _owner) ERC20Permit('GreatLottoDAOCoin') ERC20('GreatLottoDAOCoin', 'GLDC') AccessControlPartnerContract(_owner) { 
+    constructor(address _owner) ERC20Permit('GreatLottoDAOCoin') ERC20('GreatLottoDAOCoin', 'GLDC') AccessControlPartnerContract(_owner) {
     }
 
     // 管理员增发
@@ -30,23 +28,18 @@ contract DaoCoin is ERC20Votes, ERC20Permit, BeneficiaryBase, AccessControlPartn
     }
 
     // 奖池增发
-    function mintToUser(address account, uint256 assets, bool isEth) public onlyRole(PARTNER_CONTRACT_ROLE) {
-        uint256 _price =  isEth ? coinPriceEth : coinPrice;
-        uint256 shares = assets * 10 ** decimals() / _price;
+    function mintToUser(address account, uint256 assets) public onlyRole(PARTNER_CONTRACT_ROLE) {
+        uint256 shares = assets * 10 ** decimals() / coinPrice;
         _mint(account, shares);
-    }  
+    }
 
     // 修改价格
-    function changePrice(uint256 price, bool isEth) public onlyRole(DEFAULT_ADMIN_ROLE) returns (bool){
+    function changePrice(uint256 price) public onlyRole(DEFAULT_ADMIN_ROLE) returns (bool){
         if(price == 0){
             revert ErrorInvalidAmount(0);
         }
-        if(isEth){
-            coinPriceEth = price;
-        }else{
-            coinPrice = price;
-        }
-        emit PriceChanged(price, isEth);
+        coinPrice = price;
+        emit PriceChanged(price);
         return true;
     }
 

@@ -16,6 +16,9 @@ describe("GreatLottoCoin", function() {
     // 买家账户
     const buyerAddress = '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC';
 
+    // DAI 主网地址，用于"已下线"负向断言
+    const DAI_MAINNET_ADDRESS = '0x6B175474E89094C44Da98b954EedeAC495271d0F';
+
     const InitializeFixture = async () => {
         // 合约部署
         let contractList = await deploy();
@@ -24,12 +27,10 @@ describe("GreatLottoCoin", function() {
         await getCoin.getUSDTCoin(buyerAddress, 1000);
         // 买入 1000 USDC
         await getCoin.getUSDCCoin(buyerAddress, 1000);
-        // 买入 1000 DAI
-        await getCoin.getDAICoin(buyerAddress, 1000);
 
         // 重置时间戳
         await setTimeGap();
-     
+
         return contractList;
 
     }
@@ -100,18 +101,27 @@ describe("GreatLottoCoin", function() {
             expect(await getCoin['get' + tokenName + 'Balance'](greatLottoCoin.address)).to.equal(beforeData.coinBalance + ethers.parseUnits(amount + '', getCoin[tokenName + '_DECIMALS']));
             expect(await greatLottoCoin.balanceOf(buyerAddress)).to.equal(beforeData.buyerBalance + parseEther(amount + ''));
         }
-       
+
         it("Should mint", async function() {
             await checkMintCoin('USDT', 1000);
             await checkMintCoin('USDC', 1000);
-            await checkMintCoin('DAI', 1000);
         });
 
-        it("Should mint with promise", async function() {
-            await checkMintCoinWidthPromise('DAI', 1000);
+        it("Should mint with promise (USDC EIP-2612)", async function() {
             await checkMintCoinWidthPromise('USDC', 1000);
         });
-        
+
+        // DAI 已下线，传入 DAI 地址应 revert
+        it("Should revert if DAI address is passed to mint", async function() {
+            await expect(partnerTest.coinMint(DAI_MAINNET_ADDRESS, 100, buyerAddress)).to.be.revertedWithCustomError(greatLottoCoin, "ErrorUnsupportedToken").withArgs(DAI_MAINNET_ADDRESS);
+        });
+
+        // selfPermitAllowed selector 已下线
+        it("Should not have selfPermitAllowed selectors", async function() {
+            expect(greatLottoCoin.interface.fragments.find(f => f.name === 'selfPermitAllowed')).to.be.undefined;
+            expect(greatLottoCoin.interface.fragments.find(f => f.name === 'selfPermitAllowedIfNecessary')).to.be.undefined;
+        });
+
     })
 
     // 测试转账
@@ -150,7 +160,7 @@ describe("GreatLottoCoin", function() {
 
         // 授权转账
         it("Should transfer with approve", async function() {
-            let buyerCoinContract = await greatLottoCoin.connect(await ethers.getImpersonatedSigner(buyerAddress));           
+            let buyerCoinContract = await greatLottoCoin.connect(await ethers.getImpersonatedSigner(buyerAddress));
             // 准备
             let [amount, senderBalanceBefore, receiverBalanceBefore] = await checkBalanceBefore(100);
             // 授权
@@ -187,7 +197,6 @@ describe("GreatLottoCoin", function() {
             buyerCoinContract = await greatLottoCoin.connect(await ethers.getImpersonatedSigner(buyerAddress));
             await mintCoin('USDT', 1000);
             await mintCoin('USDC', 1000);
-            await mintCoin('DAI', 1000);
         });
 
         // 金额足够的提款
@@ -203,7 +212,7 @@ describe("GreatLottoCoin", function() {
             expect(await getCoin['get' + tokenName + 'Balance'](buyerAddress)).to.equal(buyerBalanceBefore + amountBig);
         };
 
-        // 金额不足的提款会失败 
+        // 金额不足的提款会失败
         let withdrawByNotEnoughBalance = async (tokenName, amount) => {
             // 提款前余额
             let balanceBefore = await getCoin['get' + tokenName + 'Balance'](greatLottoCoin.address);
@@ -219,9 +228,14 @@ describe("GreatLottoCoin", function() {
             await expect(buyerCoinContract.withdraw(elseToken, 100)).to.be.revertedWithCustomError(buyerCoinContract, "ErrorUnsupportedToken").withArgs(elseToken);
         });
 
+        // DAI 已下线
+        it("Should revert if withdraw with DAI address", async function() {
+            await expect(buyerCoinContract.withdraw(DAI_MAINNET_ADDRESS, 100)).to.be.revertedWithCustomError(buyerCoinContract, "ErrorUnsupportedToken").withArgs(DAI_MAINNET_ADDRESS);
+        });
+
         // 提款金额不足，应该revert
         it("Should revert if amount not enough", async function() {
-            await greatLottoCoin.burnFrom(buyerAddress, ethers.parseEther('2500'));
+            await greatLottoCoin.burnFrom(buyerAddress, ethers.parseEther('1500'));
 
             await expect(buyerCoinContract.withdraw(getCoin.USDT_ADDRESS, 600)).to.be.revertedWithCustomError(buyerCoinContract, "ERC20InsufficientBalance").withArgs(buyerAddress, await greatLottoCoin.balanceOf(buyerAddress), ethers.parseEther('600'));
         });
@@ -231,7 +245,6 @@ describe("GreatLottoCoin", function() {
             // 提款
             await withdrawByEnoughBalance('USDT', 100);
             await withdrawByEnoughBalance('USDC', 100);
-            await withdrawByEnoughBalance('DAI', 100);
         });
 
         it("Should revert if base coin amount not enough", async function() {
@@ -240,7 +253,6 @@ describe("GreatLottoCoin", function() {
             // 提款
             await withdrawByNotEnoughBalance('USDT', 5000);
             await withdrawByNotEnoughBalance('USDC', 5000);
-            await withdrawByNotEnoughBalance('DAI', 5000);
         });
 
     });
@@ -251,20 +263,18 @@ describe("GreatLottoCoin", function() {
         beforeEach(async () => {
             await mintCoin('USDT', 1000);
             await mintCoin('USDC', 1000);
-            await mintCoin('DAI', 1000);
         });
 
         // 奖池余额校验
         it("Should check totalSupply", async function() {
 
-            let amountLocalCoin = ethers.parseUnits('3000', decimalsLocalCoin);
-            //console.log('amountLocalCoin: '+ amountLocalCoin);
+            let amountLocalCoin = ethers.parseUnits('2000', decimalsLocalCoin);
             // 总发行量
             expect(await greatLottoCoin.totalSupply()).to.equal(amountLocalCoin);
 
             // 无需 recover
             await expect(greatLottoCoin.recover()).to.be.revertedWithCustomError(greatLottoCoin, "GreatLottoCoinBaseNoNeedRecover").withArgs(amountLocalCoin, await greatLottoCoin.totalSupply());
-        
+
         });
 
         it("Should recover", async function() {
@@ -283,7 +293,7 @@ describe("GreatLottoCoin", function() {
 
             // 执行recover
             await expect(greatLottoCoin.recover()).to.emit(greatLottoCoin, 'GreatLottoCoinBaseRecovered').withArgs(gap, totalSupplyBalance);
-            
+
             // 检测总发行量
             expect(await greatLottoCoin.totalSupply()).to.equal(totalSupplyBalance);
 
@@ -297,5 +307,5 @@ describe("GreatLottoCoin", function() {
 
 
 
-    
+
 });

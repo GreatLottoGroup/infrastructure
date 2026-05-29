@@ -41,41 +41,4 @@ interface ISelfPermit {
         bytes32 r,
         bytes32 s
     ) external payable;
-
-    /// @notice Permits this contract to spend the sender's tokens for permit signatures that have the `allowed` parameter
-    /// @dev The `owner` is always msg.sender and the `spender` is always address(this)
-    /// @param token The address of the token spent
-    /// @param nonce The current nonce of the owner
-    /// @param expiry The timestamp at which the permit is no longer valid
-    /// @param v Must produce valid secp256k1 signature from the holder along with `r` and `s`
-    /// @param r Must produce valid secp256k1 signature from the holder along with `v` and `s`
-    /// @param s Must produce valid secp256k1 signature from the holder along with `r` and `v`
-    function selfPermitAllowed(
-        address owner,
-        address token,
-        uint256 nonce,
-        uint256 expiry,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external payable;
-
-    /// @notice Permits this contract to spend the sender's tokens for permit signatures that have the `allowed` parameter
-    /// @dev The `owner` is always msg.sender and the `spender` is always address(this)
-    /// Can be used instead of #selfPermitAllowed to prevent calls from failing due to a frontrun of a call to #selfPermitAllowed.
-    /// @param token The address of the token spent
-    /// @param nonce The current nonce of the owner
-    /// @param expiry The timestamp at which the permit is no longer valid
-    /// @param v Must produce valid secp256k1 signature from the holder along with `r` and `s`
-    /// @param r Must produce valid secp256k1 signature from the holder along with `v` and `s`
-    /// @param s Must produce valid secp256k1 signature from the holder along with `r` and `v`
-    function selfPermitAllowedIfNecessary(
-        address owner,
-        address token,
-        uint256 nonce,
-        uint256 expiry,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external payable;
 }

@@ -20,11 +20,11 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
 
     using SafeERC20 for IERC20;
 
-    // Mainnet & Local             USDT                                        USDC                                        DAI
-    address[] internal _tokens = [ 0xdAC17F958D2ee523a2206206994597C13D831ec7, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48, 0x6B175474E89094C44Da98b954EedeAC495271d0F];
+    // Mainnet & Local             USDT                                        USDC
+    address[] internal _tokens = [ 0xdAC17F958D2ee523a2206206994597C13D831ec7, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48];
 
-    // Sepolia                       USDT                                        USDC                                        DAI
-    //address[] internal _tokens = [ 0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0, 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238, 0x68194a729C2450ad26072b3D33ADaCbcef39D574];
+    // Sepolia                       USDT                                        USDC
+    //address[] internal _tokens = [ 0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0, 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238];
 
     constructor(address _owner) ERC20Permit("GreatLottoCoin") ERC20("GreatLottoCoin", "GLC") AccessControlPartnerContract(_owner){
     }
@@ -37,11 +37,7 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
     
     // 签名铸造
     function mint(address token, uint256 amount, address payer, uint deadline, uint8 v, bytes32 r, bytes32 s) external noDelegateCall onlyRole(PARTNER_CONTRACT_ROLE) returns (bool){
-        if(token == _tokens[2]){
-            selfPermitAllowedIfNecessary(payer, token, IERC20Permit(token).nonces(payer), deadline, v, r, s);
-        }else{
-            selfPermitIfNecessary(payer, token, getAmount(token, amount), deadline, v, r, s);
-        }
+        selfPermitIfNecessary(payer, token, getAmount(token, amount), deadline, v, r, s);
         _depositFor(token, amount, payer, _msgSender());
         return true;
     }

@@ -20,20 +20,14 @@ abstract contract BenefitPoolBase is DeadLine, NoDelegateCall, IBenefitPoolBase,
     // 资产币地址
     address public immutable GreatLottoCoinAddress;
 
-    // 资产币地址
-    address public immutable GreatLottoEthAddress;
-
     // 治理币地址
     address public immutable GovernCoinAddress;
-
-    // 治理币地址
-    address public immutable GovernEthAddress;
 
     constructor() {}
 
     // 执行分润
     function _executeBenefit(IERC20 coin, IBeneficiaryBase governCoin) private returns (uint256 totalBenefitAmount) {
-        
+
         // 获取利润金额
         uint256 benefitTotalAmount = coin.balanceOf(address(this));
         // 获取分润受益人列表
@@ -65,17 +59,17 @@ abstract contract BenefitPoolBase is DeadLine, NoDelegateCall, IBenefitPoolBase,
     }
 
     // 执行分润
-    function executeBenefit(bool isEth, uint256 deadline) external noDelegateCall checkDeadline(deadline) returns (bool) {
-        
+    function executeBenefit(uint256 deadline) external noDelegateCall checkDeadline(deadline) returns (bool) {
+
         // 获取资产币合约
-        IERC20 coin = IERC20(isEth ? GreatLottoEthAddress : GreatLottoCoinAddress);
+        IERC20 coin = IERC20(GreatLottoCoinAddress);
         // 获取治理币合约
-        IBeneficiaryBase governCoin = IBeneficiaryBase(isEth ? GovernEthAddress : GovernCoinAddress);
+        IBeneficiaryBase governCoin = IBeneficiaryBase(GovernCoinAddress);
 
         uint256 totalBenefitAmount = _executeBenefit(coin, governCoin);
 
         // 触发事件
-        emit BenefitExecuted(msg.sender, isEth, totalBenefitAmount);
+        emit BenefitExecuted(msg.sender, totalBenefitAmount);
 
         return true;
 
@@ -86,5 +80,5 @@ abstract contract BenefitPoolBase is DeadLine, NoDelegateCall, IBenefitPoolBase,
         benefit = originAmount * benefitRate / 1000;
         afterAmount = originAmount - benefit;
     }
-    
+
 }
