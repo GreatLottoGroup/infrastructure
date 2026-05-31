@@ -143,4 +143,22 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
     ) internal virtual {}
 
     function _onRequestFulfilled(uint64 sequenceNumber, Request memory req, bytes32 randomNumber) internal virtual;
+
+    function setEntropyProvider(address newProvider) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newProvider == address(0)) revert ErrorZeroAddress();
+        emit EntropyProviderChanged(entropyProvider, newProvider);
+        entropyProvider = newProvider;
+    }
+
+    function setCallbackGasLimit(uint32 newLimit) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newLimit < MIN_CALLBACK_GAS || newLimit > MAX_CALLBACK_GAS) revert ErrorInvalidCallbackGasLimit();
+        emit CallbackGasLimitChanged(callbackGasLimit, newLimit);
+        callbackGasLimit = newLimit;
+    }
+
+    function setEntropyTimeout(uint64 newTimeout) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newTimeout < MIN_ENTROPY_TIMEOUT || newTimeout > MAX_ENTROPY_TIMEOUT) revert ErrorInvalidEntropyTimeout();
+        emit EntropyTimeoutChanged(entropyTimeout, newTimeout);
+        entropyTimeout = newTimeout;
+    }
 }

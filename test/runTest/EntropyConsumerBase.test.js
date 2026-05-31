@@ -295,4 +295,50 @@ describe("EntropyConsumerBase", function () {
       expect((await consumer.getRequest(2n)).tokenId).to.equal(5n);
     });
   });
+
+  describe("governance setters", function () {
+    it("setEntropyProvider: success + event + zero-address revert + non-admin revert", async function () {
+      const { consumer, owner, alice, bob } = await loadFixture(deployEntropyFixture);
+      const oldProvider = await consumer.entropyProvider();
+      await expect(consumer.connect(owner).setEntropyProvider(bob.address))
+        .to.emit(consumer, "EntropyProviderChanged").withArgs(oldProvider, bob.address);
+      expect(await consumer.entropyProvider()).to.equal(bob.address);
+
+      await expect(consumer.connect(owner).setEntropyProvider(ethers.ZeroAddress))
+        .to.be.revertedWithCustomError(consumer, "ErrorZeroAddress");
+
+      await expect(consumer.connect(alice).setEntropyProvider(bob.address))
+        .to.be.revertedWithCustomError(consumer, "AccessControlUnauthorizedAccount");
+    });
+
+    it("setCallbackGasLimit: bounds [100_000, 2_000_000] + event + non-admin revert", async function () {
+      const { consumer, owner, alice } = await loadFixture(deployEntropyFixture);
+      await expect(consumer.connect(owner).setCallbackGasLimit(750_000))
+        .to.emit(consumer, "CallbackGasLimitChanged").withArgs(500_000, 750_000);
+      expect(await consumer.callbackGasLimit()).to.equal(750_000n);
+
+      await expect(consumer.connect(owner).setCallbackGasLimit(99_999))
+        .to.be.revertedWithCustomError(consumer, "ErrorInvalidCallbackGasLimit");
+      await expect(consumer.connect(owner).setCallbackGasLimit(2_000_001))
+        .to.be.revertedWithCustomError(consumer, "ErrorInvalidCallbackGasLimit");
+
+      await expect(consumer.connect(alice).setCallbackGasLimit(750_000))
+        .to.be.revertedWithCustomError(consumer, "AccessControlUnauthorizedAccount");
+    });
+
+    it("setEntropyTimeout: bounds [60s, 24h] + event + non-admin revert", async function () {
+      const { consumer, owner, alice } = await loadFixture(deployEntropyFixture);
+      await expect(consumer.connect(owner).setEntropyTimeout(7200))
+        .to.emit(consumer, "EntropyTimeoutChanged").withArgs(3600, 7200);
+      expect(await consumer.entropyTimeout()).to.equal(7200n);
+
+      await expect(consumer.connect(owner).setEntropyTimeout(59))
+        .to.be.revertedWithCustomError(consumer, "ErrorInvalidEntropyTimeout");
+      await expect(consumer.connect(owner).setEntropyTimeout(24 * 3600 + 1))
+        .to.be.revertedWithCustomError(consumer, "ErrorInvalidEntropyTimeout");
+
+      await expect(consumer.connect(alice).setEntropyTimeout(7200))
+        .to.be.revertedWithCustomError(consumer, "AccessControlUnauthorizedAccount");
+    });
+  });
 });
