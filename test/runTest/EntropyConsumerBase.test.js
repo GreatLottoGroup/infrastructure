@@ -4,6 +4,9 @@ const { ethers } = require("hardhat");
 const { deployEntropyFixture, DEFAULT_FEE } = require("../utils/deployEntropyFixture");
 
 describe("EntropyConsumerBase", function () {
+  const RANDOM = "0x" + "11".repeat(32);
+  const PROVIDER_RANDOM = "0x" + "22".repeat(32);
+  const FEE = 100n;
 
   describe("deployment", function () {
     it("sets entropy address, provider, defaults", async function () {
@@ -37,9 +40,6 @@ describe("EntropyConsumerBase", function () {
   });
 
   describe("_requestRandomness", function () {
-    const RANDOM = "0x" + "11".repeat(32);
-    const FEE = 100n;
-
     it("submits request, writes _request, emits RequestSubmitted", async function () {
       const { consumer, alice } = await loadFixture(deployEntropyFixture);
       const tx = consumer.connect(alice).requestRandomness(
@@ -95,10 +95,6 @@ describe("EntropyConsumerBase", function () {
   });
 
   describe("entropyCallback", function () {
-    const RANDOM = "0x" + "11".repeat(32);
-    const PROVIDER_RANDOM = "0x" + "22".repeat(32);
-    const FEE = 100n;
-
     it("dispatches to _onRequestFulfilled, deletes _request, emits RequestFulfilled", async function () {
       const { consumer, mockEntropy, alice, owner } = await loadFixture(deployEntropyFixture);
       // Submit request first (becomes seq=1 in MockEntropyWithFee)
@@ -121,30 +117,35 @@ describe("EntropyConsumerBase", function () {
       expect(await consumer.lastTokenId()).to.equal(7n);
       expect(await consumer.lastRequester()).to.equal(alice.address);
       expect(await consumer.lastItemCount()).to.equal(2);
-      expect(await consumer.lastRandomNumber()).to.not.equal(ethers.ZeroHash);
+      expect(await consumer.lastRandomNumber()).to.equal(PROVIDER_RANDOM);
     });
 
-    it("silently returns when callback fires for non-existent seq (already-deleted)", async function () {
+    it("silently returns when callback fires for non-existent seq", async function () {
       const { consumer, mockEntropy, alice, owner } = await loadFixture(deployEntropyFixture);
-      // Submit + reveal once
-      await consumer.connect(alice).requestRandomness(7n, alice.address, 1, RANDOM, { value: FEE });
-      await mockEntropy.connect(owner).mockReveal(await consumer.getAddress(), 1n, PROVIDER_RANDOM);
 
-      // _request[1] already deleted by the first callback. A second mockReveal for seq=1
-      // would fail at the harness level (request was deleted by the first reveal).
-      // Instead, directly call entropyCallback path on a non-existent seq via mockReveal on seq=999.
-      // Since seq=999 was never submitted, the harness will reject it.
-      // To test the base's "silent return on !exists" we need a more direct path:
-      // — Use a never-requested seq via the harness's internal mechanism, OR
-      // — Verify that re-revealing a deleted seq is rejected at the harness level (proves nothing about the base).
-      //
-      // Simpler & sufficient: assert getRequest(1).exists == false after the first reveal.
-      // That confirms the base did delete the slot. The "silent return" branch is exercised
-      // by Task 5 retry tests where an OLD seq's callback fires after retry has replaced it.
-      //
-      // For Task 4 we just verify the base correctly cleans up.
-      const req = await consumer.getRequest(1n);
-      expect(req.exists).to.equal(false);
+      // Submit a real request as control (seq=1)
+      await consumer.connect(alice).requestRandomness(7n, alice.address, 1, RANDOM, { value: FEE });
+
+      // Force-trigger callback for a never-requested seq=999.
+      // Base's entropyCallback should silent-return because _request[999].exists == false.
+      // Tx must succeed (no revert), no RequestFulfilled emitted.
+      const tx = await mockEntropy.connect(owner).mockForceCallback(
+        await consumer.getAddress(),
+        999n,
+        PROVIDER_RANDOM
+      );
+      const receipt = await tx.wait();
+
+      // No RequestFulfilled event emitted for seq=999
+      const requestFulfilledFilter = consumer.filters.RequestFulfilled(999n);
+      const events = await consumer.queryFilter(requestFulfilledFilter, receipt.blockNumber, receipt.blockNumber);
+      expect(events.length).to.equal(0);
+
+      // Real request seq=1 untouched
+      expect((await consumer.getRequest(1n)).exists).to.equal(true);
+
+      // mock subclass not invoked (its lastSequence stays at default 0)
+      expect(await consumer.lastSequence()).to.equal(0n);
     });
 
     it("reverts entire callback when _onRequestFulfilled reverts", async function () {
@@ -156,7 +157,7 @@ describe("EntropyConsumerBase", function () {
       // and a revert in the consumer's callback should bubble up and fail the reveal tx.
       await expect(
         mockEntropy.connect(owner).mockReveal(await consumer.getAddress(), 1n, PROVIDER_RANDOM)
-      ).to.be.reverted; // any revert is fine; pin specific reason if available
+      ).to.be.revertedWith("fulfill-revert");
 
       // Because the callback reverted, _request[1] was NOT deleted (rollback)
       const req = await consumer.getRequest(1n);

@@ -52,6 +52,12 @@ contract MockEntropyWithFee is IEntropyV2 {
         _failed[sequenceNumber] = true;
     }
 
+    /// @dev Force-invokes IEntropyConsumer._entropyCallback bypassing request-existence checks.
+    ///      Used to exercise the consumer's silent-return-on-!exists branch with a never-requested seq.
+    function mockForceCallback(address requester, uint64 seq, bytes32 randomNumber) external {
+        IEntropyConsumer(requester)._entropyCallback(seq, defaultProvider, randomNumber);
+    }
+
     // ============ IEntropyV2 implementation ============
 
     function requestV2() external payable override returns (uint64) {
