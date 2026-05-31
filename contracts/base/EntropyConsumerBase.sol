@@ -89,5 +89,58 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         emit RequestFulfilled(sequenceNumber, req.requester, req.tokenId);
     }
 
+    function retryRequest(
+        uint64 oldSequenceNumber,
+        bytes32 newUserRandomNumber,
+        uint256 deadline
+    ) external payable checkDeadline(deadline) returns (uint64 newSequenceNumber) {
+        Request memory old = _request[oldSequenceNumber];
+        if (!old.exists) revert ErrorRequestNotFound();
+        if (old.requester != msg.sender) revert ErrorNotRequester();
+        if (newUserRandomNumber == bytes32(0)) revert ErrorInvalidUserRandom();
+
+        bool timedOut = block.timestamp >= uint256(old.requestedAt) + uint256(entropyTimeout);
+        bool callbackFailed = false;
+        if (!timedOut) {
+            EntropyStructsV2.Request memory pythReq = entropy.getRequestV2(entropyProvider, oldSequenceNumber);
+            callbackFailed = (pythReq.callbackStatus == EntropyStatusConstants.CALLBACK_FAILED);
+        }
+        if (!timedOut && !callbackFailed) revert ErrorRetryNotAllowed();
+
+        _beforeRetry(oldSequenceNumber, old);
+
+        uint256 fee = entropyFee();
+        if (msg.value < fee) revert ErrorInsufficientEntropyFee(fee, msg.value);
+
+        newSequenceNumber = entropy.requestV2{value: fee}(entropyProvider, newUserRandomNumber, callbackGasLimit);
+        uint128 newFee = uint128(fee);
+
+        delete _request[oldSequenceNumber];
+        _request[newSequenceNumber] = Request({
+            tokenId: old.tokenId,
+            requester: old.requester,
+            requestedAt: uint64(block.timestamp),
+            itemCount: old.itemCount,
+            paidFee: newFee,
+            exists: true
+        });
+
+        emit RequestRetried(oldSequenceNumber, newSequenceNumber, old.requester, old.paidFee, newFee);
+
+        _postRetry(oldSequenceNumber, newSequenceNumber, _request[newSequenceNumber]);
+
+        uint256 excess = msg.value - fee;
+        if (excess > 0) _refundFee(msg.sender, excess);
+    }
+
+    function _beforeRetry(uint64 /*oldSequenceNumber*/, Request memory /*old*/) internal virtual {}
+
+    /// @dev 子类可在 base 退余款前同步业务状态（例如把 NFT 的 sequenceNumber 切到 newSeq）
+    function _postRetry(
+        uint64 /*oldSequenceNumber*/,
+        uint64 /*newSequenceNumber*/,
+        Request memory /*updated*/
+    ) internal virtual {}
+
     function _onRequestFulfilled(uint64 sequenceNumber, Request memory req, bytes32 randomNumber) internal virtual;
 }

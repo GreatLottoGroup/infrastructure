@@ -13,6 +13,8 @@ contract MockEntropyConsumer is EntropyConsumerBase {
     bool    public revertOnFulfill;
     bool    public revertOnBeforeRetry;
     uint64  public lastPostRequestSeq;
+    uint64  public lastPostRetryOldSeq;
+    uint64  public lastPostRetryNewSeq;
 
     constructor(address entropy_, address provider_) EntropyConsumerBase(entropy_, provider_) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -39,6 +41,15 @@ contract MockEntropyConsumer is EntropyConsumerBase {
 
     function _postRequest(uint64 sequenceNumber, Request memory /*req*/) internal override {
         lastPostRequestSeq = sequenceNumber;
+    }
+
+    function _beforeRetry(uint64 /*oldSequenceNumber*/, Request memory /*old*/) internal override {
+        if (revertOnBeforeRetry) revert("before-retry-revert");
+    }
+
+    function _postRetry(uint64 oldSequenceNumber, uint64 newSequenceNumber, Request memory /*updated*/) internal override {
+        lastPostRetryOldSeq = oldSequenceNumber;
+        lastPostRetryNewSeq = newSequenceNumber;
     }
 
     function setRevertOnFulfill(bool v) external { revertOnFulfill = v; }

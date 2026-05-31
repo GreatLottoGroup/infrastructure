@@ -164,4 +164,135 @@ describe("EntropyConsumerBase", function () {
       expect(req.exists).to.equal(true);
     });
   });
+
+  describe("retryRequest", function () {
+    const NEW_RANDOM = "0x" + "33".repeat(32);
+    const FAR_DEADLINE = 9999999999n;
+
+    async function submit(consumer, alice) {
+      await consumer.connect(alice).requestRandomness(5n, alice.address, 2, RANDOM, { value: FEE });
+      return 1n; // first seq from MockEntropyWithFee is 1 (verified in Task 3)
+    }
+
+    async function fastForward(seconds) {
+      await ethers.provider.send("evm_increaseTime", [seconds]);
+      await ethers.provider.send("evm_mine");
+    }
+
+    it("retries successfully after timeout", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+
+      const tx = consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: FEE });
+      // newSeq should be 2 (incremented from 1)
+      await expect(tx).to.emit(consumer, "RequestRetried").withArgs(oldSeq, 2n, alice.address, FEE, FEE);
+
+      expect((await consumer.getRequest(oldSeq)).exists).to.equal(false);
+      const newReq = await consumer.getRequest(2n);
+      expect(newReq.exists).to.equal(true);
+      expect(newReq.tokenId).to.equal(5n);
+      expect(newReq.itemCount).to.equal(2);
+      expect(newReq.requester).to.equal(alice.address);
+    });
+
+    it("reverts ErrorRetryNotAllowed before timeout if not CALLBACK_FAILED", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await expect(
+        consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: FEE })
+      ).to.be.revertedWithCustomError(consumer, "ErrorRetryNotAllowed");
+    });
+
+    it("retries on CALLBACK_FAILED before timeout", async function () {
+      const { consumer, mockEntropy, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      // Mark CALLBACK_FAILED on the harness for this seq, no time passing
+      await mockEntropy.markCallbackFailed(oldSeq);
+
+      const tx = consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: FEE });
+      await expect(tx).to.emit(consumer, "RequestRetried");
+
+      expect((await consumer.getRequest(oldSeq)).exists).to.equal(false);
+      expect((await consumer.getRequest(2n)).exists).to.equal(true);
+    });
+
+    it("reverts ErrorRequestNotFound for unknown seq", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      await expect(
+        consumer.connect(alice).retryRequest(999n, NEW_RANDOM, FAR_DEADLINE, { value: FEE })
+      ).to.be.revertedWithCustomError(consumer, "ErrorRequestNotFound");
+    });
+
+    it("reverts ErrorNotRequester for non-original requester", async function () {
+      const { consumer, alice, bob } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+      await expect(
+        consumer.connect(bob).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: FEE })
+      ).to.be.revertedWithCustomError(consumer, "ErrorNotRequester");
+    });
+
+    it("reverts ErrorInvalidUserRandom for zero random", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+      await expect(
+        consumer.connect(alice).retryRequest(oldSeq, ethers.ZeroHash, FAR_DEADLINE, { value: FEE })
+      ).to.be.revertedWithCustomError(consumer, "ErrorInvalidUserRandom");
+    });
+
+    it("reverts ErrorInsufficientEntropyFee when msg.value < fee", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+      await expect(
+        consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: 50n })
+      ).to.be.revertedWithCustomError(consumer, "ErrorInsufficientEntropyFee");
+    });
+
+    it("propagates _beforeRetry revert", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+      await consumer.setRevertOnBeforeRetry(true);
+      await expect(
+        consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: FEE })
+      ).to.be.revertedWith("before-retry-revert");
+    });
+
+    it("reverts on stale deadline", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+      const past = (await ethers.provider.getBlock("latest")).timestamp - 1;
+      await expect(
+        consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, past, { value: FEE })
+      ).to.be.revertedWithCustomError(consumer, "DeadLineExpiredTransaction");
+    });
+
+    it("refunds excess msg.value to caller on retry", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+      const before = await ethers.provider.getBalance(alice.address);
+      const overpay = FEE + 999n;
+      const tx = await consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: overpay });
+      const receipt = await tx.wait();
+      const gasCost = receipt.gasUsed * receipt.gasPrice;
+      const after = await ethers.provider.getBalance(alice.address);
+      expect(before - after).to.equal(FEE + gasCost);
+    });
+
+    it("invokes _postRetry hook with old + new seq after _request[newSeq] is written", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const oldSeq = await submit(consumer, alice);
+      await fastForward(3601);
+      await consumer.connect(alice).retryRequest(oldSeq, NEW_RANDOM, FAR_DEADLINE, { value: FEE });
+      expect(await consumer.lastPostRetryOldSeq()).to.equal(oldSeq);
+      expect(await consumer.lastPostRetryNewSeq()).to.equal(2n);
+      // hook saw newSeq populated
+      expect((await consumer.getRequest(2n)).tokenId).to.equal(5n);
+    });
+  });
 });
