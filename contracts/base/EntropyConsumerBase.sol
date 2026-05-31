@@ -34,6 +34,14 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         return address(entropy);
     }
 
+    function entropyFee() public view returns (uint256) {
+        return entropy.getFeeV2(entropyProvider, callbackGasLimit);
+    }
+
+    function getRequest(uint64 sequenceNumber) external view returns (Request memory) {
+        return _request[sequenceNumber];
+    }
+
     function entropyCallback(uint64 sequenceNumber, address /*provider*/, bytes32 randomNumber) internal override {
         Request memory req = _request[sequenceNumber];
         if (!req.exists) return;
