@@ -718,3 +718,4 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
 | v1 | 2026-05-31 | 初稿 |
 | v1.1 | 2026-05-31 | 修正 Pyth SDK 常量名为 `EntropyStatusConstants.CALLBACK_FAILED` |
 | v1.2 | 2026-05-31 | 增加 `_postRequest` / `_postRetry` 虚钩，确保子类业务 effects 在 base 退余款（让出控制权）前完成，整体 CEI-correct |
+| v1.3 | 2026-05-31 | Phase 1 实施完成；EntropyConsumerBase 落地 + 26 个单元测试用例 |
