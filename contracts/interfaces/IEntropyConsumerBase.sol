@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-interface IEntropyConsumerBase {
+import {IErrorsBase} from "./IErrorsBase.sol";
+
+interface IEntropyConsumerBase is IErrorsBase {
     struct Request {
         uint256 tokenId;
         address requester;
@@ -42,5 +44,4 @@ interface IEntropyConsumerBase {
     error ErrorInvalidEntropyTimeout();
     error ErrorInvalidCallbackGasLimit();
     error ErrorRefundFailed();
-    error ErrorZeroAddress();
 }

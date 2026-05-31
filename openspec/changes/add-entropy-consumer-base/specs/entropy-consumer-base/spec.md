@@ -18,7 +18,7 @@
 #### Scenario: 零地址部署被拒绝
 
 - **WHEN** 部署时 `entropyAddress == address(0)` 或 `entropyProvider == address(0)`
-- **THEN** MUST revert with `ErrorZeroAddress`
+- **THEN** MUST revert with `ErrorZeroAddress`（inherited from `IErrorsBase` via `IEntropyConsumerBase is IErrorsBase`，避免子类双继承时的 selector 冲突）
 
 #### Scenario: entropyFee 计算
 
