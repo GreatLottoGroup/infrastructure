@@ -42,6 +42,45 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         return _request[sequenceNumber];
     }
 
+    function _requestRandomness(
+        uint256 tokenId,
+        address requester,
+        uint32 itemCount,
+        bytes32 userRandomNumber,
+        uint256 paid
+    ) internal returns (uint64 sequenceNumber, uint128 paidFee) {
+        if (userRandomNumber == bytes32(0)) revert ErrorInvalidUserRandom();
+        uint256 fee = entropyFee();
+        if (paid < fee) revert ErrorInsufficientEntropyFee(fee, paid);
+
+        sequenceNumber = entropy.requestV2{value: fee}(entropyProvider, userRandomNumber, callbackGasLimit);
+        paidFee = uint128(fee);
+
+        _request[sequenceNumber] = Request({
+            tokenId: tokenId,
+            requester: requester,
+            requestedAt: uint64(block.timestamp),
+            itemCount: itemCount,
+            paidFee: paidFee,
+            exists: true
+        });
+
+        emit RequestSubmitted(sequenceNumber, requester, tokenId, itemCount, paidFee);
+
+        _postRequest(sequenceNumber, _request[sequenceNumber]);
+
+        uint256 excess = paid - fee;
+        if (excess > 0) _refundFee(requester, excess);
+    }
+
+    /// @dev 子类可在 base 退余款（让出控制权）前继续写业务 storage / emit
+    function _postRequest(uint64 /*sequenceNumber*/, Request memory /*req*/) internal virtual {}
+
+    function _refundFee(address to, uint256 amount) internal {
+        (bool ok, ) = payable(to).call{value: amount}("");
+        if (!ok) revert ErrorRefundFailed();
+    }
+
     function entropyCallback(uint64 sequenceNumber, address /*provider*/, bytes32 randomNumber) internal override {
         Request memory req = _request[sequenceNumber];
         if (!req.exists) return;

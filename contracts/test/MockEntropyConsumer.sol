@@ -12,6 +12,7 @@ contract MockEntropyConsumer is EntropyConsumerBase {
     uint32  public lastItemCount;
     bool    public revertOnFulfill;
     bool    public revertOnBeforeRetry;
+    uint64  public lastPostRequestSeq;
 
     constructor(address entropy_, address provider_) EntropyConsumerBase(entropy_, provider_) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -24,6 +25,20 @@ contract MockEntropyConsumer is EntropyConsumerBase {
         lastTokenId = req.tokenId;
         lastRequester = req.requester;
         lastItemCount = req.itemCount;
+    }
+
+    /// @dev 测试用 public wrapper，把 msg.value 当 paid 传入
+    function requestRandomness(
+        uint256 tokenId,
+        address requester,
+        uint32 itemCount,
+        bytes32 userRandomNumber
+    ) external payable returns (uint64 sequenceNumber, uint128 paidFee) {
+        return _requestRandomness(tokenId, requester, itemCount, userRandomNumber, msg.value);
+    }
+
+    function _postRequest(uint64 sequenceNumber, Request memory /*req*/) internal override {
+        lastPostRequestSeq = sequenceNumber;
     }
 
     function setRevertOnFulfill(bool v) external { revertOnFulfill = v; }
