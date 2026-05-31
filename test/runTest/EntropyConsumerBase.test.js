@@ -85,6 +85,24 @@ describe("EntropyConsumerBase", function () {
       expect(before - after).to.equal(FEE + gasCost);
     });
 
+    it("reverts ErrorRefundFailed when requester rejects ETH", async function () {
+      const { consumer, alice } = await loadFixture(deployEntropyFixture);
+      const Rejector = await ethers.getContractFactory("RejectingReceiver");
+      const rejector = await Rejector.deploy();
+      await rejector.waitForDeployment();
+      const overpay = FEE + 1n;
+      // alice sends overpay; refund target is the rejector contract → refund fails
+      await expect(
+        consumer.connect(alice).requestRandomness(
+          1n,
+          await rejector.getAddress(),
+          1,
+          RANDOM,
+          { value: overpay }
+        )
+      ).to.be.revertedWithCustomError(consumer, "ErrorRefundFailed");
+    });
+
     it("invokes _postRequest hook after _request write, before refund", async function () {
       const { consumer, alice } = await loadFixture(deployEntropyFixture);
       await consumer.connect(alice).requestRandomness(77n, alice.address, 1, RANDOM, { value: FEE });
@@ -282,6 +300,25 @@ describe("EntropyConsumerBase", function () {
       const gasCost = receipt.gasUsed * receipt.gasPrice;
       const after = await ethers.provider.getBalance(alice.address);
       expect(before - after).to.equal(FEE + gasCost);
+    });
+
+    it("reverts ErrorRefundFailed when caller rejects ETH refund on retry", async function () {
+      // Setup: deploy a rejector, submit a request from it (so it becomes requester),
+      // fast-forward, retry from the rejector with overpay → refund target is rejector → revert.
+      const { consumer } = await loadFixture(deployEntropyFixture);
+      const Rejector = await ethers.getContractFactory("RejectingReceiverCaller");
+      const caller = await Rejector.deploy(await consumer.getAddress());
+      await caller.waitForDeployment();
+
+      // Caller submits request; ETH forwarded directly (no receive() invocation)
+      await caller.submitRequest(5n, RANDOM, { value: FEE });
+      // first seq is 1
+      await fastForward(3601);
+
+      // Caller calls retryRequest; refund target is caller (msg.sender), but caller refuses ETH
+      await expect(
+        caller.retryRequestFromMe(1n, NEW_RANDOM, FAR_DEADLINE, { value: FEE + 1n })
+      ).to.be.revertedWithCustomError(consumer, "ErrorRefundFailed");
     });
 
     it("invokes _postRetry hook with old + new seq after _request[newSeq] is written", async function () {
