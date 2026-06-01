@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **工作区协调层**：本仓属于 GreatLottoGroup 4 仓工作区。跨仓需求 / 流水线 / 共享知识库见 `@see` [../.claude-workspace/CLAUDE.md](../.claude-workspace/CLAUDE.md)（知识库索引 [../.claude-workspace/knowledge/index.md](../.claude-workspace/knowledge/index.md)）。
+>
+> **superpower × OpenSpec 路径覆盖**：`writing-plans` 的 plan 落 `openspec/changes/<id>/design.md` 与 `tasks.md`（覆盖默认 `docs/superpowers/...`）；`requesting-code-review` / `/flow-review-spec` 笔记落 `openspec/changes/<id>/review.md`。三道 review 门：方案(`/flow-review-spec`) → 代码(`requesting-code-review`) → 安全(`/security-review`，合约仓必跑)。**本仓接口变更是下游 ScratchCard / Core 的契约源，先定稿。**
+
 ## 常用命令
 
 ### 开发

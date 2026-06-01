@@ -9,4 +9,9 @@ interface IPrizePoolBase {
     function setChannelBenefitRate(uint16 rate) external returns (bool);
     function setSellBenefitRate(uint16 rate) external returns (bool);
 
+    // 分润率只读 getter（由 PrizePoolBase 的 public 状态变量实现）；
+    // 下游通过 `is IPrizePoolBase` 即可经接口读取实时分润率，无需重复声明。
+    function channelBenefitRate() external view returns (uint16);
+    function sellBenefitRate() external view returns (uint16);
+
 }

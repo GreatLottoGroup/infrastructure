@@ -29,11 +29,11 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, IPrizePoolBase 
     // SalesChannel 注册表
     address public immutable SalesChannelAddress;
 
-    // 渠道分润率（千分比）
-    uint16 public channelBenefitRate;
+    // 渠道分润率（千分比）；public getter 实现 IPrizePoolBase.channelBenefitRate()
+    uint16 public override channelBenefitRate;
 
-    // 销售分润率（千分比）
-    uint16 public sellBenefitRate;
+    // 销售分润率（千分比）；public getter 实现 IPrizePoolBase.sellBenefitRate()
+    uint16 public override sellBenefitRate;
 
     constructor(
         address coin,
