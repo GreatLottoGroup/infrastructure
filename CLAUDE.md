@@ -76,6 +76,8 @@ npx hardhat ignition verify chain-11155111 # sepolia
 - `AccessControlPartnerContract` — OpenZeppelin `AccessControl` + `PARTNER_CONTRACT_ROLE`，重写 `grantRole` 限制仅合约地址可被授权
 - `BeneficiaryBase` — 维护受益人列表，通过 `_update` hook 嵌入 `DaoCoin`
 - `BenefitPoolBase` — 单轨分润执行逻辑，`DaoBenefitPool` 的实现基础
+- `EntropyConsumerBase` — Pyth Entropy V2 异步随机数请求/回调/重试/治理基类，下游通过 `is EntropyConsumerBase` 接入
+- `PrizePoolBase` — 抽象奖池基类，提供奖金池收款（GLC 直接转账 / 外币 mint / EIP-2612 permit）、`_transferTo` 严格不变量转账、渠道+DAO 两段分润 pipeline、治理币增发等 internal helper，以及独立的渠道/sell 分润率治理 setter（`setChannelBenefitRate` / `setSellBenefitRate`）。下游（ScratchCard / GreatLottoCore）通过 `is PrizePoolBase` 继承，构造时显式传入 4 个 immutable 地址 + 2 档分润率初值
 - `NoDelegateCall` — 阻止对敏感函数的 delegatecall
 - `DeadLine` — 交易截止时间校验（`checkDeadline` modifier）
 - `SelfPermit` — 仅 EIP-2612 标准 permit（`selfPermit` / `selfPermitIfNecessary`）；DAI/CHAI 风格入口已下线
