@@ -10,13 +10,18 @@ async function initContract(contractName, ...args){
 }
 
 async function deploy(config) {
-    let { ownerAddress, coinContractName } = config || {};
+    let { ownerAddress, coinContractName, tokens } = config || {};
 
     ownerAddress = ownerAddress || '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
     coinContractName = coinContractName || 'GreatLottoCoinTest';
+    // GreatLottoCoin._tokens 现为构造参数（不再硬编码）。fork 测试默认主网 USDT / USDC。
+    tokens = tokens || [
+        '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT
+        '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    ];
 
     // GreatLottoCoin 初始化
-    const greatLottoCoin = await initContract(coinContractName, ownerAddress);
+    const greatLottoCoin = await initContract(coinContractName, tokens, ownerAddress);
 
     // DaoCoin 初始化
     const daoCoin = await initContract("DaoCoin", ownerAddress);

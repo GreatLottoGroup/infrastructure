@@ -20,13 +20,14 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
 
     using SafeERC20 for IERC20;
 
-    // Mainnet & Local             USDT                                        USDC
-    address[] internal _tokens = [ 0xdAC17F958D2ee523a2206206994597C13D831ec7, 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48];
+    address[] internal _tokens;
 
-    // Sepolia                       USDT                                        USDC
-    //address[] internal _tokens = [ 0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0, 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238];
-
-    constructor(address _owner) ERC20Permit("GreatLottoCoin") ERC20("GreatLottoCoin", "GLC") AccessControlPartnerContract(_owner){
+    constructor(address[] memory tokensAddress_, address owner_) 
+        ERC20Permit("GreatLottoCoin") 
+        ERC20("GreatLottoCoin", "GLC") 
+        AccessControlPartnerContract(owner_)
+    {
+        _tokens = tokensAddress_;
     }
 
     // 需要校验只有主合约才能调用

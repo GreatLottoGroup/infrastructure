@@ -20,10 +20,17 @@ describe("EntropyConsumerBase", function () {
     it("reverts on zero address in constructor", async function () {
       const Mock = await ethers.getContractFactory("MockEntropyConsumer");
       const ZERO = ethers.ZeroAddress;
-      await expect(Mock.deploy(ZERO, ethers.Wallet.createRandom().address))
+      const owner = ethers.Wallet.createRandom().address;
+      await expect(Mock.deploy(ZERO, ethers.Wallet.createRandom().address, owner))
         .to.be.revertedWithCustomError(Mock, "ErrorZeroAddress");
-      await expect(Mock.deploy(ethers.Wallet.createRandom().address, ZERO))
+      await expect(Mock.deploy(ethers.Wallet.createRandom().address, ZERO, owner))
         .to.be.revertedWithCustomError(Mock, "ErrorZeroAddress");
+    });
+
+    it("grants DEFAULT_ADMIN_ROLE to the owner_ constructor arg", async function () {
+      const { consumer, owner } = await loadFixture(deployEntropyFixture);
+      const DEFAULT_ADMIN_ROLE = ethers.ZeroHash;
+      expect(await consumer.hasRole(DEFAULT_ADMIN_ROLE, owner.address)).to.equal(true);
     });
 
     it("entropyFee() returns the fee from MockEntropy", async function () {

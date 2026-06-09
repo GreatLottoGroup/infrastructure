@@ -5,7 +5,7 @@ import "../GreatLottoCoin.sol";
 
 contract GreatLottoCoinTest is GreatLottoCoin {
 
-    constructor(address _owner) GreatLottoCoin(_owner) {}
+    constructor(address[] memory tokensAddress_, address owner_) GreatLottoCoin(tokensAddress_, owner_) {}
 
     // 向给定账户无偿铸造货币 only for test
     function mintFor(address recipient, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) returns (bool){

@@ -16,7 +16,7 @@ contract MockEntropyConsumer is EntropyConsumerBase {
     uint64  public lastPostRetryOldSeq;
     uint64  public lastPostRetryNewSeq;
 
-    constructor(address entropy_, address provider_) EntropyConsumerBase(entropy_, provider_) {
+    constructor(address entropy_, address provider_, address owner_) EntropyConsumerBase(entropy_, provider_, owner_) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 

@@ -9,6 +9,7 @@ import "../interfaces/ISalesChannel.sol";
 import "../interfaces/IPrizePoolBase.sol";
 
 import "./AccessControlPartnerContract.sol";
+import "./NoDelegateCall.sol";
 
 /// @title PrizePoolBase
 /// @notice 抽象奖池基类：提供奖金池收款（GLC 直接转账 / 外币 mint / EIP-2612 permit）、分润计算、
@@ -17,7 +18,7 @@ import "./AccessControlPartnerContract.sol";
 /// @dev    helper 全部 internal；setter external，受 `DEFAULT_ADMIN_ROLE` 守护。
 ///         调用方负责保证 `channelBenefitRate + sellBenefitRate <= 1000`，超过会让
 ///         `_distributeChannelAndDaoBenefits` underflow revert（已知 governance footgun，base 不强制 cap）。
-abstract contract PrizePoolBase is AccessControlPartnerContract, IPrizePoolBase {
+abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall, IPrizePoolBase {
     using SafeERC20 for ICoinBase;
 
     // 资产币地址（GLC）
@@ -35,15 +36,21 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, IPrizePoolBase 
     // 销售分润率（千分比）；public getter 实现 IPrizePoolBase.sellBenefitRate()
     uint16 public override sellBenefitRate;
 
+    // 付奖兜底：push 付款（如 callback 内付奖、债务清偿）失败时按 user 记账，转 pull 模式，
+    // 避免整笔交易 / entropy 回调 revert。资产币为单一 GLC，故仅记金额。
+    mapping(address user => uint256) private _pendingPayouts;
+
     constructor(
         address coin,
         address daoCoinAddr,
         address daoBenefitPoolAddr,
         address salesChannelAddr,
-        address _owner,
+        address owner_,
         uint16 initialChannelRate,
         uint16 initialSellRate
-    ) AccessControlPartnerContract(_owner) {
+    ) 
+    AccessControlPartnerContract(owner_) 
+    {
         GreatLottoCoinAddress = coin;
         DaoCoinAddress = daoCoinAddr;
         DaoBenefitPoolAddress = daoBenefitPoolAddr;
@@ -112,6 +119,28 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, IPrizePoolBase 
         if (coin.balanceOf(address(this)) != _balance - amount) {
             revert ErrorPaymentUnsuccessful();
         }
+    }
+
+    /// @notice 付奖兜底：push 付款失败时按 user 记账（转 pull 模式）。
+    /// @dev    internal，供子类在 try/catch 付奖失败分支调用，避免回调 / 交易整体 revert。
+    function _recordPendingPayout(address user, uint256 amount) internal {
+        _pendingPayouts[user] += amount;
+        emit PayoutPending(user, GreatLottoCoinAddress, amount);
+    }
+
+    /// @notice 用户提取此前 push 失败而记账的兜底欠款（单一资产币 GLC）。
+    /// @dev    pull 支付；noDelegateCall 防止经 delegatecall 篡改记账上下文。
+    function claimPayout() external noDelegateCall {
+        uint256 amount = _pendingPayouts[msg.sender];
+        if (amount == 0) revert ErrorNoPendingPayout();
+        _pendingPayouts[msg.sender] = 0;
+        _transferTo(_getCoin(), msg.sender, amount);
+        emit PayoutClaimed(msg.sender, GreatLottoCoinAddress, amount);
+    }
+
+    /// @notice 查询某地址的待提取兜底欠款金额。
+    function pendingPayoutOf(address user) external view returns (uint256) {
+        return _pendingPayouts[user];
     }
 
     /// @notice 给指定渠道分润；id 不存在（status==false && chn==address(0)）时 revert，其它情况打款。

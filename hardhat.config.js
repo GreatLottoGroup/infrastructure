@@ -42,30 +42,25 @@ module.exports = {
       },
       timeout: 1000000
     },
-    mainnet: {
-        url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+    base: {
+        url: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 8453,
         accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
-        ignition: {
-            maxFeePerGasLimit: 2_000_000_000n, // 2 gwei
-            maxPriorityFeePerGas: 1_000_000_000n, // 1 gwei
-        },
     },
-    sepolia: {
-        url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+    baseSepolia: {
+        url: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 84532,
         accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
-        ignition: {
-            maxFeePerGasLimit: 5_000_000_000n, // 5 gwei
-            maxPriorityFeePerGas: 1_000_000_000n, // 1 gwei
-        },
     },
-    holesky: {
-        url: `https://eth-holesky.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-        chainId: 17000,
+    arbitrum: {
+        url: `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 42161,
         accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
-        ignition: {
-            //maxFeePerGasLimit: 1_000_000_000n, // 1 gwei
-            //maxPriorityFeePerGas: 1_000_000_000n, // 1 gwei
-        },
+    },
+    arbitrumSepolia: {
+        url: `https://arb-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 421614,
+        accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
     }
   },
 
@@ -80,16 +75,39 @@ module.exports = {
   },
 
   etherscan: {
-    apiKey: `${process.env.ETHERSCAN_API_KEY}`,
+    // apiKey 的 key 必须与链名（内置链名 / customChains[].network）一致
+    // arbitrumOne(42161) 用 hardhat-verify 内置链配置，无需 customChain
+    apiKey: {
+        base: `${process.env.BASESCAN_API_KEY}`,
+        baseSepolia: `${process.env.BASESCAN_API_KEY}`,
+        arbitrumOne: `${process.env.ARBISCAN_API_KEY}`,
+        arbitrumSepolia: `${process.env.ARBISCAN_API_KEY}`,
+    },
     customChains: [
         {
-            network: "holesky",
-            chainId: 17000,
+            network: "base",
+            chainId: 8453,
             urls: {
-              apiURL: "https://api-holesky.etherscan.io/api",
-              browserURL: "https://holesky.etherscan.io",
+              apiURL: "https://api.basescan.org/api",
+              browserURL: "https://basescan.org",
             },
-          }
+        },
+        {
+            network: "baseSepolia",
+            chainId: 84532,
+            urls: {
+              apiURL: "https://api-sepolia.basescan.org/api",
+              browserURL: "https://sepolia.basescan.org",
+            },
+        },
+        {
+            network: "arbitrumSepolia",
+            chainId: 421614,
+            urls: {
+              apiURL: "https://api-sepolia.arbiscan.io/api",
+              browserURL: "https://sepolia.arbiscan.io",
+            },
+        }
     ]
   },
 

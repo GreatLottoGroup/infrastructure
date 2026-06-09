@@ -22,12 +22,15 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
 
     mapping(uint64 sequenceNumber => Request) internal _request;
 
-    constructor(address entropy_, address entropyProvider_) {
+    constructor(address entropy_, address entropyProvider_, address owner_) {
         if (entropy_ == address(0) || entropyProvider_ == address(0)) revert ErrorZeroAddress();
         entropy = IEntropyV2(entropy_);
         entropyProvider = entropyProvider_;
         callbackGasLimit = 500_000;
         entropyTimeout = 1 hours;
+        
+        // 设置 owner
+        _grantRole(DEFAULT_ADMIN_ROLE, owner_ == address(0) ? _msgSender() : owner_);
     }
 
     function getEntropy() internal view override returns (address) {
@@ -69,14 +72,15 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
 
         _postRequest(sequenceNumber, _request[sequenceNumber]);
 
-        uint256 excess = paid - fee;
-        if (excess > 0) _refundFee(requester, excess);
+        _refundFee(requester, paid - fee);
     }
 
     /// @dev 子类可在 base 退余款（让出控制权）前继续写业务 storage / emit
     function _postRequest(uint64 /*sequenceNumber*/, Request memory /*req*/) internal virtual {}
 
+    /// @dev 退还超付的 entropy fee；amount 为 0 时直接跳过（无差额无需转账）
     function _refundFee(address to, uint256 amount) internal {
+        if (amount == 0) return;
         (bool ok, ) = payable(to).call{value: amount}("");
         if (!ok) revert ErrorRefundFailed();
     }
@@ -99,6 +103,9 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         if (old.requester != msg.sender) revert ErrorNotRequester();
         if (newUserRandomNumber == bytes32(0)) revert ErrorInvalidUserRandom();
 
+        // 重试放行条件：超时(timedOut) 或 Pyth 回调失败(callbackFailed)，二者满足其一即可。
+        // 若两者都不满足，说明请求仍在正常 in-flight（等待回调），禁止重试 → revert。
+        // 优化：已超时时无需再查链上状态，故仅在「未超时」时才花一次外部 call 查 Pyth 回调状态。
         bool timedOut = block.timestamp >= uint256(old.requestedAt) + uint256(entropyTimeout);
         bool callbackFailed = false;
         if (!timedOut) {
@@ -129,8 +136,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
 
         _postRetry(oldSequenceNumber, newSequenceNumber, _request[newSequenceNumber]);
 
-        uint256 excess = msg.value - fee;
-        if (excess > 0) _refundFee(msg.sender, excess);
+        _refundFee(msg.sender, msg.value - fee);
     }
 
     function _beforeRetry(uint64 /*oldSequenceNumber*/, Request memory /*old*/) internal virtual {}

@@ -11,10 +11,12 @@ async function deployEntropyFixture() {
   const mockEntropy = await MockEntropyWithFee.deploy(owner.address, DEFAULT_FEE);
   await mockEntropy.waitForDeployment();
 
-  // Deploy MockEntropyConsumer with owner as provider (matches mock's defaultProvider).
+  // Deploy MockEntropyConsumer with owner as provider (matches mock's defaultProvider)
+  // and owner as the DEFAULT_ADMIN_ROLE holder (EntropyConsumerBase 3rd ctor arg).
   const MockEntropyConsumer = await ethers.getContractFactory("MockEntropyConsumer");
   const consumer = await MockEntropyConsumer.deploy(
     await mockEntropy.getAddress(),
+    owner.address,
     owner.address
   );
   await consumer.waitForDeployment();

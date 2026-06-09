@@ -455,4 +455,53 @@ describe("PrizePoolBase", function () {
         });
     });
 
+    // --- Section 13: 付奖兜底 push→pull (_recordPendingPayout / claimPayout / pendingPayoutOf) ---
+    describe("payout fallback", function () {
+        // 取一个真实 signer 作为领款人（claimPayout 以 msg.sender 记账）
+        let claimant;
+        beforeEach(async () => {
+            claimant = await ethers.getImpersonatedSigner(buyerAddress);
+            await ethers.provider.send("hardhat_setBalance", [buyerAddress, "0x1000000000000000000"]);
+        });
+
+        it("13.1 pendingPayoutOf defaults to 0", async function () {
+            expect(await harness.pendingPayoutOf(buyerAddress)).to.equal(0n);
+        });
+
+        it("13.2 recordPendingPayout accrues amount + emits PayoutPending(user, GLC, amount)", async function () {
+            await expect(harness.recordPendingPayout(buyerAddress, parseEther('3')))
+                .to.emit(harness, "PayoutPending").withArgs(buyerAddress, greatLottoCoin.address, parseEther('3'));
+            expect(await harness.pendingPayoutOf(buyerAddress)).to.equal(parseEther('3'));
+
+            // 二次记账累加
+            await harness.recordPendingPayout(buyerAddress, parseEther('2'));
+            expect(await harness.pendingPayoutOf(buyerAddress)).to.equal(parseEther('5'));
+        });
+
+        it("13.3 claimPayout with no pending reverts ErrorNoPendingPayout", async function () {
+            await expect(harness.connect(claimant).claimPayout())
+                .to.be.revertedWithCustomError(harness, "ErrorNoPendingPayout");
+        });
+
+        it("13.4 claimPayout pays GLC, zeroes balance, emits PayoutClaimed", async function () {
+            await harness.recordPendingPayout(buyerAddress, parseEther('5'));
+            // 给 harness 充值 GLC 以支付兜底欠款
+            await greatLottoCoin.mintFor(harness.address, parseEther('5'));
+
+            const balBefore = await greatLottoCoin.balanceOf(buyerAddress);
+            await expect(harness.connect(claimant).claimPayout())
+                .to.emit(harness, "PayoutClaimed").withArgs(buyerAddress, greatLottoCoin.address, parseEther('5'));
+            expect(await greatLottoCoin.balanceOf(buyerAddress)).to.equal(balBefore + parseEther('5'));
+            expect(await harness.pendingPayoutOf(buyerAddress)).to.equal(0n);
+        });
+
+        it("13.5 second claimPayout after draining reverts ErrorNoPendingPayout", async function () {
+            await harness.recordPendingPayout(buyerAddress, parseEther('5'));
+            await greatLottoCoin.mintFor(harness.address, parseEther('5'));
+            await harness.connect(claimant).claimPayout();
+            await expect(harness.connect(claimant).claimPayout())
+                .to.be.revertedWithCustomError(harness, "ErrorNoPendingPayout");
+        });
+    });
+
 });

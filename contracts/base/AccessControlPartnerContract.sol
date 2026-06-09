@@ -10,9 +10,9 @@ abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
 
     bytes32 public constant PARTNER_CONTRACT_ROLE = keccak256("PARTNER_CONTRACT_ROLE");
 
-    constructor(address _owner){
+    constructor(address owner_){
 
-        _grantRole(DEFAULT_ADMIN_ROLE, _owner == address(0) ? _msgSender() : _owner);
+        _grantRole(DEFAULT_ADMIN_ROLE, owner_ == address(0) ? _msgSender() : owner_);
         
         _setRoleAdmin(PARTNER_CONTRACT_ROLE, DEFAULT_ADMIN_ROLE);
 

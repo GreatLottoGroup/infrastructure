@@ -43,6 +43,11 @@ contract PrizePoolBaseHarness is PrizePoolBase {
         _transferTo(coin, recipient, amount);
     }
 
+    // 付奖兜底：暴露 internal 记账入口，模拟子类在 push 付款失败分支调用
+    function recordPendingPayout(address user, uint256 amount) external {
+        _recordPendingPayout(user, amount);
+    }
+
     function channelBenefitTransfer(ICoinBase coin, uint256 benefit, uint256 chnId) external {
         _channelBenefitTransfer(coin, benefit, chnId);
     }
