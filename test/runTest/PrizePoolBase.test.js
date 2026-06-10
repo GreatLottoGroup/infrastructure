@@ -504,4 +504,75 @@ describe("PrizePoolBase", function () {
         });
     });
 
+    // --- Section 14: 软付款 _softPay / _payoutTransfer + 兜底聚合 pendingPayoutTotal ---
+    describe("soft pay", function () {
+        let claimant;
+        beforeEach(async () => {
+            claimant = await ethers.getImpersonatedSigner(buyerAddress);
+            await ethers.provider.send("hardhat_setBalance", [buyerAddress, "0x1000000000000000000"]);
+        });
+
+        it("14.1 _payoutTransfer 外部直调被守卫拒绝 ErrorUnauthorizedSelfCall", async function () {
+            await expect(harness["_payoutTransfer"](recipientAddress, parseEther('1')))
+                .to.be.revertedWithCustomError(harness, "ErrorUnauthorizedSelfCall");
+        });
+
+        it("14.2 softPay 成功：recipient +amount、harness -amount、不记兜底、聚合不变", async function () {
+            const amount = parseEther('5');
+            await greatLottoCoin.mintFor(harness.address, parseEther('10'));
+            const recipBefore = await greatLottoCoin.balanceOf(recipientAddress);
+            const harnessBefore = await greatLottoCoin.balanceOf(harness.address);
+
+            await harness.softPay(recipientAddress, amount);
+
+            expect(await greatLottoCoin.balanceOf(recipientAddress) - recipBefore).to.equal(amount);
+            expect(harnessBefore - await greatLottoCoin.balanceOf(harness.address)).to.equal(amount);
+            expect(await harness.pendingPayoutOf(recipientAddress)).to.equal(0n);
+            expect(await harness.pendingPayoutTotal()).to.equal(0n);
+        });
+
+        it("14.3 softPay 转账失败（余额不足）：不 revert、转兜底、聚合自增、harness 余额不变", async function () {
+            const amount = parseEther('5');
+            // 故意不给 harness 充值 → _transferTo 余额不足 revert → _softPay catch 转兜底
+            const harnessBefore = await greatLottoCoin.balanceOf(harness.address);
+
+            await expect(harness.softPay(recipientAddress, amount))
+                .to.emit(harness, "PayoutPending").withArgs(recipientAddress, greatLottoCoin.address, amount);
+
+            expect(await harness.pendingPayoutOf(recipientAddress)).to.equal(amount);
+            expect(await harness.pendingPayoutTotal()).to.equal(amount);
+            // 资金留存（这里本就没有，余额不变）
+            expect(await greatLottoCoin.balanceOf(harness.address)).to.equal(harnessBefore);
+        });
+
+        it("14.4 softPay amount==0：不 revert、不记兜底", async function () {
+            await expect(harness.softPay(recipientAddress, 0)).not.to.be.reverted;
+            expect(await harness.pendingPayoutOf(recipientAddress)).to.equal(0n);
+            expect(await harness.pendingPayoutTotal()).to.equal(0n);
+        });
+
+        it("14.5 pendingPayoutTotal == Σ pendingPayoutOf（多用户记账）", async function () {
+            await harness.recordPendingPayout(buyerAddress, parseEther('3'));
+            await harness.recordPendingPayout(recipientAddress, parseEther('7'));
+            await harness.recordPendingPayout(buyerAddress, parseEther('2')); // buyer 累加到 5
+            expect(await harness.pendingPayoutOf(buyerAddress)).to.equal(parseEther('5'));
+            expect(await harness.pendingPayoutOf(recipientAddress)).to.equal(parseEther('7'));
+            expect(await harness.pendingPayoutTotal()).to.equal(parseEther('12'));
+        });
+
+        it("14.6 claimPayout 后聚合同步自减配平", async function () {
+            await harness.recordPendingPayout(buyerAddress, parseEther('5'));
+            await harness.recordPendingPayout(recipientAddress, parseEther('7'));
+            expect(await harness.pendingPayoutTotal()).to.equal(parseEther('12'));
+
+            await greatLottoCoin.mintFor(harness.address, parseEther('5'));
+            await harness.connect(claimant).claimPayout(); // buyer 提走 5
+
+            expect(await harness.pendingPayoutOf(buyerAddress)).to.equal(0n);
+            // 聚合减去 buyer 的 5，仅剩 recipient 的 7
+            expect(await harness.pendingPayoutTotal()).to.equal(parseEther('7'));
+            expect(await harness.pendingPayoutTotal()).to.equal(await harness.pendingPayoutOf(recipientAddress));
+        });
+    });
+
 });

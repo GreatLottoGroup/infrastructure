@@ -13,6 +13,9 @@ interface IPrizePoolBase {
     // 无可提取的兜底欠款时 revert
     error ErrorNoPendingPayout();
 
+    // `_payoutTransfer` 仅允许本合约经 `this.` 自调用；非自调用时 revert（供下游软付款 frame 隔离守卫）
+    error ErrorUnauthorizedSelfCall();
+
     function setChannelBenefitRate(uint16 rate) external returns (bool);
     function setSellBenefitRate(uint16 rate) external returns (bool);
 

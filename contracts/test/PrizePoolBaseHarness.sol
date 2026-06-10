@@ -48,6 +48,11 @@ contract PrizePoolBaseHarness is PrizePoolBase {
         _recordPendingPayout(user, amount);
     }
 
+    // 软付款：暴露 internal 入口（_payoutTransfer 已是 base external，测试可直调以验证自调用守卫）
+    function softPay(address to, uint256 amount) external {
+        _softPay(to, amount);
+    }
+
     function channelBenefitTransfer(ICoinBase coin, uint256 benefit, uint256 chnId) external {
         _channelBenefitTransfer(coin, benefit, chnId);
     }

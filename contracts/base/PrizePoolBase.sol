@@ -40,6 +40,11 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
     // 避免整笔交易 / entropy 回调 revert。资产币为单一 GLC，故仅记金额。
     mapping(address user => uint256) private _pendingPayouts;
 
+    // 兜底欠款聚合：恒等于 Σ _pendingPayouts[user]，即「当前滞留合约内、尚未被 claim 的兜底欠款总额」。
+    // 仅在 _recordPendingPayout 自增、claimPayout 自减两处维护；供下游（如 GreatLottoCore）把滞留
+    // 兜底资金纳入余额不变量。
+    uint256 private _pendingPayoutTotal;
+
     constructor(
         address coin,
         address daoCoinAddr,
@@ -125,7 +130,31 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
     /// @dev    internal，供子类在 try/catch 付奖失败分支调用，避免回调 / 交易整体 revert。
     function _recordPendingPayout(address user, uint256 amount) internal {
         _pendingPayouts[user] += amount;
+        _pendingPayoutTotal += amount;
         emit PayoutPending(user, GreatLottoCoinAddress, amount);
+    }
+
+    /// @dev 仅供 `_softPay` 经 `this._payoutTransfer(...)` 自调用——制造独立 message-call frame 以隔离
+    ///      调用方 catch 的回滚边界：其 revert 只回滚本 frame 的转账，不回滚调用方在 `_softPay` 之前写入的
+    ///      账本扣减，从而保证「账本扣一次 + 兜底记一次」无重复计账。
+    ///      **MUST NOT** 被外部 / 内部直调（`msg.sender == address(this)` 守卫）；**不得改写为 internal**，
+    ///      否则共用同一 frame、frame 隔离失效，重复计账修正不成立。
+    function _payoutTransfer(address to, uint256 amount) external {
+        if (msg.sender != address(this)) revert ErrorUnauthorizedSelfCall();
+        _transferTo(_getCoin(), to, amount);
+    }
+
+    /// @notice 软付款：push 转账失败转 pendingPayout 兜底，永不 revert（回调安全）。
+    /// @dev    经独立 frame 调 `_payoutTransfer`；任意转账失败（收款方 revert / 代币黑名单 / 余额不足 /
+    ///         后置校验失败）都被 catch，资金留存合约内并转 pull 兜底。调用方 MUST 在调用本 helper **之前**
+    ///         完成自身账本扣减（CEI），使「账本扣一次 + 兜底记一次」在 push 失败时仍配平。
+    ///         amount==0 时 `_transferTo` 早退、视为成功、不记兜底。
+    function _softPay(address to, uint256 amount) internal {
+        try this._payoutTransfer(to, amount) {
+            // 已付
+        } catch {
+            _recordPendingPayout(to, amount);
+        }
     }
 
     /// @notice 用户提取此前 push 失败而记账的兜底欠款（单一资产币 GLC）。
@@ -134,6 +163,7 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         uint256 amount = _pendingPayouts[msg.sender];
         if (amount == 0) revert ErrorNoPendingPayout();
         _pendingPayouts[msg.sender] = 0;
+        _pendingPayoutTotal -= amount;
         _transferTo(_getCoin(), msg.sender, amount);
         emit PayoutClaimed(msg.sender, GreatLottoCoinAddress, amount);
     }
@@ -141,6 +171,12 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
     /// @notice 查询某地址的待提取兜底欠款金额。
     function pendingPayoutOf(address user) external view returns (uint256) {
         return _pendingPayouts[user];
+    }
+
+    /// @notice 当前滞留合约内、尚未被 claim 的兜底欠款总额（= Σ pendingPayoutOf(user)）。
+    /// @dev    供下游把软付款失败而滞留的资金纳入余额不变量（如 GreatLottoCore 的偿付能力检查）。
+    function pendingPayoutTotal() public view returns (uint256) {
+        return _pendingPayoutTotal;
     }
 
     /// @notice 给指定渠道分润；id 不存在（status==false && chn==address(0)）时 revert，其它情况打款。
