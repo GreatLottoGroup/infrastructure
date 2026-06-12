@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {PrizePoolBaseHarness} from "../../../contracts/test/PrizePoolBaseHarness.sol";
+import {PrizePoolBaseHarness} from "../harness/PrizePoolBaseHarness.sol";
 import {GreatLottoCoin} from "../../../contracts/GreatLottoCoin.sol";
 import {DaoCoin} from "../../../contracts/DaoCoin.sol";
 import {DaoBenefitPool} from "../../../contracts/DaoBenefitPool.sol";

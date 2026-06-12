@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import {BaseTest} from "./base/BaseTest.sol";
-import {MockEntropyWithFee} from "../../contracts/test/MockEntropyWithFee.sol";
-import {MockEntropyConsumer} from "../../contracts/test/MockEntropyConsumer.sol";
+import {MockEntropyWithFee} from "./mocks/MockEntropyWithFee.sol";
+import {MockEntropyConsumer} from "./harness/MockEntropyConsumer.sol";
 import {IEntropyConsumerBase} from "../../contracts/interfaces/IEntropyConsumerBase.sol";
 import {IErrorsBase} from "../../contracts/interfaces/IErrorsBase.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";

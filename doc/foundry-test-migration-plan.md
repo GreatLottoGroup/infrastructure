@@ -6,8 +6,8 @@
 >
 > **最终清理（含实战修正，见文末「实战修正」）**：
 > - `test/` 只剩 `test/foundry/`——`test/runTest`(8 mocha) + `test/utils` + `test/scripts`(运维脚本，部署已由 Ignition 承接) + `test/abi` + `.mocharc.json` **全部删除**。
-> - `contracts/test/` 精简到 6 个、**不能清空**：`GreatLottoCoinTest` 被 ScratchCard(`InfraImports.sol`) 与 GreatLottoCore(`GreatLottoCoinTest2.sol`) **跨仓 import** 必须留；5 个 mock（MockEntropyWithFee/Consumer/FeeOnTransfer/SilentFail/PrizePoolBaseHarness）被 Foundry 测试用必须留。仅 `PartnerTest` + `RejectingReceiver(Caller)` 是死桩已删。
-> - `hardhat.config`：去掉 mocha/coverage/standalone gas-reporter require；**`gasReporter` 保留 `enabled:true`**（toolbox 强依赖该键；但仅 hardhat test 时出数，日常 gas 用 `forge test --gas-report` / `npm run gas`）。`package.json`：`test`→`forge test`、`gas`→`forge test --gas-report`、`coverage`→`forge coverage --ir-minimum`、`compile`→`hardhat compile`。
+> - `contracts/test/` 现**只剩 `GreatLottoCoinTest`**：它被 ScratchCard(`InfraImports.sol`) 与 GreatLottoCore(`GreatLottoCoinTest2.sol`) **跨仓 import**，是发布给下游的 Test 合约、必须留原路径。5 个纯 infra-test mock 已**迁入 `test/foundry/`**：mock 类（MockEntropyWithFee/FeeOnTransfer/SilentFail）入 `test/foundry/mocks/`、harness 类（MockEntropyConsumer/PrizePoolBaseHarness，具体化/暴露抽象基类）入 `test/foundry/harness/`——hardhat 自此不再编译它们（`hardhat compile` 66 files）。`PartnerTest` + `RejectingReceiver(Caller)` 死桩已删。
+> - `hardhat.config`：去掉 mocha/coverage/standalone gas-reporter require；**`gasReporter` 保留键但 `enabled:false`**（toolbox 加载会写该键、缺键 TypeError；但 mocha 已删它出不了数，无意义故关）。`package.json`：`test`→`forge test`、`gas`→`forge test --gas-report`（Foundry 才是 gas 工具）、`coverage`→`forge coverage --ir-minimum`、`compile`→`hardhat compile`。
 >
 > **复制到下游时的环境注意**：本机到 github/paradigm/soliditylang 网络不稳——solc 从 Hardhat 缓存拷进 `~/.svm/`、forge-std 用 `git clone --depth 1`（见步骤 1）。GreatLottoCore 是 **viaIR 无 optimizer**，foundry.toml profile 不可照抄 infrastructure。
 
@@ -113,7 +113,7 @@ test/foundry/
 
 原则：**Foundry 不消除「链上需要一个表现得像 X 的合约」这一需求**，但提供三个机制让桩缩小/消失——① 测试合约直接 `is XxxBase` 继承被测合约后**直调 internal**（无需 external wrapper）；② cheatcode（`vm.mockCall` / `vm.etch` / `deal`）；③ **测试合约本身就是合约**（可被授 PARTNER_CONTRACT_ROLE）。cheatcode 替代不了「跨调用维持 EVM 状态」的桩（有状态生命周期、与 balanceOf 耦合的记账）——这些保留为真实 mock。
 
-**净目标（已据实修正）：`contracts/test/` 尽量瘦身，但 _不可清空_——被下游跨仓 import 的 Test 合约（如 `GreatLottoCoinTest`）必须留在原路径；被 Foundry 测试 import 的 mock 也留（迁不迁进 `test/foundry/` 取决于是否要让 hardhat 停止编译它们，本仓选择留在 `contracts/test/`，hardhat 一并编译、无害）。纯 mocha 用的死桩才删。⚠️ 删任何 `contracts/test/*.sol` 前，必须 grep 下游仓 `@greatlotto/infrastructure/contracts/test/` 的 import。**
+**净目标（已据实落地）：`contracts/test/` 只保留被下游跨仓 import 的 Test 合约（本仓即 `GreatLottoCoinTest`）；纯 infra-test 的 mock/harness 全部迁入 `test/foundry/{mocks,harness}/`（hardhat 不再编译，生产树更干净）；死桩删除。⚠️ 删/迁任何 `contracts/test/*.sol` 前，必须 grep 下游仓 `@greatlotto/infrastructure/contracts/test/` 的 import——被 import 的不能动路径。**
 
 | 现有桩 | 存在原因 | Foundry 处置 |
 |--------|---------|------------|
@@ -173,6 +173,6 @@ npx hardhat compile && npx hardhat ignition ... # 仍走 Hardhat
 4. **抽象基类**：测试合约直接 `is XxxBase` 或内联 `XxxHarness is XxxBase` 具体化；`PrizePoolBaseHarness` 已暴露全部 internal，本仓直接复用未再瘦身（够用即可，不必为「删 wrapper」改 contracts/test）。
 5. **PARTNER_CONTRACT_ROLE 授给测试合约自身**：测试合约即合约且字节码 > 1000（`_isContract` 阈值），`grantRole(PARTNER_ROLE, address(this))` 后直调 mint/mintToUser，免 `PartnerTest`。
 6. **GLC 余额用 `deal(address(glc), who, amt)`** 直接铸，免跑底层 mint 全流程；fee-on-transfer / silent-fail 异常代币复用 `contracts/test/` 现成 mock 并 `ICoinBase(address(mock))` 强转传入。
-7. **gasReporter 必须保留键**：`@nomicfoundation/hardhat-toolbox` 加载时写 `config.gasReporter.enabled`，删掉整个 `gasReporter` 配置块会 `TypeError: Cannot set properties of undefined`——保留 `gasReporter: { enabled: true }`。但它仅 hardhat test 出数，gas 实际看 `forge test --gas-report`。
+7. **gasReporter 必须保留键、但置 false**：`@nomicfoundation/hardhat-toolbox` 加载时写 `config.gasReporter.enabled`，删掉整个 `gasReporter` 块会 `TypeError: Cannot set properties of undefined`——保留 `gasReporter: { enabled: false }`。它仅 hardhat test 出数、mocha 删后无意义，故 enabled:false；gas 实际看 `forge test --gas-report`（`npm run gas`）。
 8. **删 `contracts/test/*.sol` 前必查跨仓**：infrastructure 是被 ScratchCard/Core 经 npm 包消费的上游，`grep -rn "@greatlotto/infrastructure/contracts/test/" <下游仓>/contracts`；`GreatLottoCoinTest` 即被双下游 import，删不得。
 9. **`test/scripts` 运维脚本可随 mocha 一起删**：部署由 `ignition/modules/` 承接，手写 deploy/approve/init 脚本及其 `test/utils`、`test/abi` 依赖整体废弃。

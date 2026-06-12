@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-// Hardhat-only test harness: exposes PrizePoolBase internal helpers as external wrappers.
+// Foundry test harness: exposes PrizePoolBase internal helpers as external wrappers.
 // MUST NOT be deployed to production networks.
 
-import "../base/PrizePoolBase.sol";
-import "../interfaces/ICoinBase.sol";
+import "../../../contracts/base/PrizePoolBase.sol";
+import "../../../contracts/interfaces/ICoinBase.sol";
 
 contract PrizePoolBaseHarness is PrizePoolBase {
 

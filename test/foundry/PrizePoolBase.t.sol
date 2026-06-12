@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {BaseTest} from "./base/BaseTest.sol";
-import {PrizePoolBaseHarness} from "../../contracts/test/PrizePoolBaseHarness.sol";
+import {PrizePoolBaseHarness} from "./harness/PrizePoolBaseHarness.sol";
 import {GreatLottoCoin} from "../../contracts/GreatLottoCoin.sol";
 import {DaoCoin} from "../../contracts/DaoCoin.sol";
 import {DaoBenefitPool} from "../../contracts/DaoBenefitPool.sol";
@@ -13,8 +13,8 @@ import {IErrorsBase} from "../../contracts/interfaces/IErrorsBase.sol";
 import {ISalesChannel} from "../../contracts/interfaces/ISalesChannel.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {MockERC20Permit} from "./mocks/MockERC20.sol";
-import {MockFeeOnTransferCoin} from "../../contracts/test/MockFeeOnTransferCoin.sol";
-import {MockSilentFailCoin} from "../../contracts/test/MockSilentFailCoin.sol";
+import {MockFeeOnTransferCoin} from "./mocks/MockFeeOnTransferCoin.sol";
+import {MockSilentFailCoin} from "./mocks/MockSilentFailCoin.sol";
 
 /// @title PrizePoolBaseTest
 /// @notice 经 PrizePoolBaseHarness 全覆盖 PrizePoolBase 的 internal helper 与治理 setter：

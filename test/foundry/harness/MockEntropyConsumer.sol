@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-import {EntropyConsumerBase} from "../base/EntropyConsumerBase.sol";
+import {EntropyConsumerBase} from "../../../contracts/base/EntropyConsumerBase.sol";
 
 /// @dev 测试用最小子类。把基类 internal 暴露为 public、把 callback 内的 randomNumber 写入 mapping。
 contract MockEntropyConsumer is EntropyConsumerBase {
