@@ -8,6 +8,7 @@ import {ICoinBase} from "../../contracts/interfaces/ICoinBase.sol";
 import {IErrorsBase} from "../../contracts/interfaces/IErrorsBase.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {MockERC20Permit} from "./mocks/MockERC20.sol";
+import {MockSilentFailCoin} from "./mocks/MockSilentFailCoin.sol";
 
 /// @title GreatLottoCoinTest
 /// @notice GreatLottoCoin（GLC = 白名单稳定币的 18 位封装）全覆盖：直接 mint / permit mint /
@@ -171,5 +172,37 @@ contract GreatLottoCoinTest is PermitHelper {
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, ADMIN_ROLE)
         );
         glc.recover();
+    }
+
+    // ---------------------------------------------------------------------
+    // 异常代币：收/付后置余额校验（ErrorPaymentUnsuccessful）
+    // ---------------------------------------------------------------------
+
+    /// @dev 用 silent-fail 底层币（transfer 返 true 但不动余额）触发 mint/_depositFor 的收款后置校验。
+    function _glcWithSilentFail() internal returns (GreatLottoCoin g, MockSilentFailCoin sf) {
+        sf = new MockSilentFailCoin();
+        address[] memory toks = new address[](1);
+        toks[0] = address(sf);
+        g = new GreatLottoCoin(toks, owner);
+        vm.prank(owner);
+        g.grantRole(PARTNER_ROLE, address(this));
+    }
+
+    function test_mint_revert_whenPaymentUnsuccessful() public {
+        (GreatLottoCoin g, MockSilentFailCoin sf) = _glcWithSilentFail();
+        // safeTransferFrom 返回 true 但合约实际未收到 → balanceBefore+underlying > balanceOf → revert
+        vm.expectRevert(IErrorsBase.ErrorPaymentUnsuccessful.selector);
+        g.mint(address(sf), 100, alice);
+    }
+
+    function test_withdraw_revert_whenPaymentUnsuccessful() public {
+        (GreatLottoCoin g, MockSilentFailCoin sf) = _glcWithSilentFail();
+        // 让合约「账面」持有底层币、并给 alice 凭空塞 GLC 以通过销毁
+        sf.mintFor(address(g), 100e18);
+        deal(address(g), alice, 100e18);
+        // safeTransfer 返回 true 但未支出 → balanceBefore-payAmount < balanceOf → revert
+        vm.prank(alice);
+        vm.expectRevert(IErrorsBase.ErrorPaymentUnsuccessful.selector);
+        g.withdraw(address(sf), 100);
     }
 }

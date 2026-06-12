@@ -73,10 +73,4 @@ abstract contract BenefitPoolBase is DeadLine, NoDelegateCall, IBenefitPoolBase,
 
     }
 
-    // 分润计算
-    function _getBenefitByRate(uint originAmount, uint16 benefitRate) private pure returns(uint benefit, uint afterAmount){
-        benefit = originAmount * benefitRate / 1000;
-        afterAmount = originAmount - benefit;
-    }
-
 }

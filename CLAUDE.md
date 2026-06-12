@@ -43,6 +43,7 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js --network baseSep
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrumSepolia --reset --verify
 
 # 主网
+# Mainnet（生产前需将 ignition 模块改为部署 GreatLottoCoin 而非 GreatLottoCoinTest）
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network base --reset --verify
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrum --reset --verify
 ```

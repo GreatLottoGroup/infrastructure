@@ -38,19 +38,17 @@ npx hardhat clean
 ## 部署
 
 ```shell
-# 本地（hardhat 临时网络）
-npx hardhat ignition deploy ignition/modules/infrastructure.js
-
-# Localhost 节点
+# 部署到本地
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network localhost
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network localhost --reset
 
-# Sepolia
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network sepolia --verify
-npx hardhat ignition verify chain-11155111
+# 部署到测试网（首发链 Base / Arbitrum，见 hardhat.config.js networks）
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network baseSepolia --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrumSepolia --reset --verify
 
+# 主网
 # Mainnet（生产前需将 ignition 模块改为部署 GreatLottoCoin 而非 GreatLottoCoinTest）
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network mainnet --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network base --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrum --reset 
 ```
 
 ## 部署 Checklist

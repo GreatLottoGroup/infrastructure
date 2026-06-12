@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-import {BaseTest} from "./base/BaseTest.sol";
+import {PermitHelper} from "./base/PermitHelper.sol";
 import {PrizePoolBaseHarness} from "./harness/PrizePoolBaseHarness.sol";
 import {GreatLottoCoin} from "../../contracts/GreatLottoCoin.sol";
 import {DaoCoin} from "../../contracts/DaoCoin.sol";
@@ -20,7 +20,7 @@ import {MockSilentFailCoin} from "./mocks/MockSilentFailCoin.sol";
 /// @notice 经 PrizePoolBaseHarness 全覆盖 PrizePoolBase 的 internal helper 与治理 setter：
 ///         收款 / 严格转账（含 fee-on-transfer & silent-fail 异常代币）/ 两段分润 / 兜底记账
 ///         （softPay→pending→claim）/ 自调用守卫 / 分润率治理。GLC 余额用 deal 直接铸，免跑底层 mint。
-contract PrizePoolBaseTest is BaseTest {
+contract PrizePoolBaseTest is PermitHelper {
     PrizePoolBaseHarness internal h;
     GreatLottoCoin internal glc;
     DaoCoin internal dao;
@@ -91,6 +91,46 @@ contract PrizePoolBaseTest is BaseTest {
     function test_colletWithCoin_revert_whenAmountZero() public {
         vm.expectRevert(abi.encodeWithSelector(IErrorsBase.ErrorInvalidAmount.selector, 0));
         h.colletWithCoin(address(glc), alice, 0);
+    }
+
+    function test_colletWithCoin_externalTokenPath_mintsGlc() public {
+        // token != GLC → 走 coin.mint(token, amount, payer)：拉 payer 的底层 usdc、铸 GLC 给 harness
+        usdc.mint(alice, 100e6);
+        vm.prank(alice);
+        usdc.approve(address(glc), 100e6);
+
+        h.colletWithCoin(address(usdc), alice, 100);
+
+        assertEq(usdc.balanceOf(address(glc)), 100e6);
+        assertEq(glc.balanceOf(address(h)), 100e18);
+    }
+
+    function test_colletWithCoin_permitGlcPath_permitsThenPulls() public {
+        // GLC 路径 permit 重载：allowance 不足 → 先 permit 再 transferFrom
+        (address payer, uint256 pk) = makeAddrAndKey("payer");
+        deal(address(glc), payer, 100e18);
+        uint256 dl = futureDeadline();
+        (uint8 v, bytes32 r, bytes32 s) =
+            signPermit(address(glc), pk, payer, address(h), 100e18, glc.nonces(payer), dl);
+
+        h.colletWithCoin(address(glc), payer, 100, dl, v, r, s);
+
+        assertEq(glc.balanceOf(address(h)), 100e18);
+        assertEq(glc.balanceOf(payer), 0);
+    }
+
+    function test_colletWithCoin_permitExternalPath_mintsGlc() public {
+        // 外币路径 permit 重载：coin.mint(token, amount, payer, deadline, v, r, s)
+        (address payer, uint256 pk) = makeAddrAndKey("payer");
+        usdc.mint(payer, 100e6);
+        uint256 dl = futureDeadline();
+        (uint8 v, bytes32 r, bytes32 s) =
+            signPermit(address(usdc), pk, payer, address(glc), 100e6, usdc.nonces(payer), dl);
+
+        h.colletWithCoin(address(usdc), payer, 100, dl, v, r, s);
+
+        assertEq(usdc.balanceOf(address(glc)), 100e6);
+        assertEq(glc.balanceOf(address(h)), 100e18);
     }
 
     // ---------------------------------------------------------------------
