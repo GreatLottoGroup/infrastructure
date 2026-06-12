@@ -176,3 +176,26 @@ npx hardhat compile && npx hardhat ignition ... # 仍走 Hardhat
 7. **gasReporter 必须保留键、但置 false**：`@nomicfoundation/hardhat-toolbox` 加载时写 `config.gasReporter.enabled`，删掉整个 `gasReporter` 块会 `TypeError: Cannot set properties of undefined`——保留 `gasReporter: { enabled: false }`。它仅 hardhat test 出数、mocha 删后无意义，故 enabled:false；gas 实际看 `forge test --gas-report`（`npm run gas`）。
 8. **删 `contracts/test/*.sol` 前必查跨仓**：infrastructure 是被 ScratchCard/Core 经 npm 包消费的上游，`grep -rn "@greatlotto/infrastructure/contracts/test/" <下游仓>/contracts`；`GreatLottoCoinTest` 即被双下游 import，删不得。
 9. **`test/scripts` 运维脚本可随 mocha 一起删**：部署由 `ignition/modules/` 承接，手写 deploy/approve/init 脚本及其 `test/utils`、`test/abi` 依赖整体废弃。
+
+## 下游迁移待办（infrastructure 已完成，ScratchCard / GreatLottoCore 待办）
+
+infrastructure 已闭环（测试在 Foundry、覆盖 95.5%）。下游两仓按本方案 + 上面「实战修正」复制即可。**建议各起一个新会话**（换 cwd、上下文干净），本文档跨仓可读、作为唯一入口。
+
+### ScratchCard
+起手 prompt：
+> 参照 `infrastructure/doc/foundry-test-migration-plan.md`（含「实战修正」），把 ScratchCard 仓合约测试迁到 Foundry，Hardhat 只留部署+ABI。先 review 现有 mocha 测试与 `contracts/test/` 桩，按同方案出迁移计划再实施。
+
+要点：
+- ScratchCard 的随机源是 **Pyth Entropy mock（开奖 mock），不是真实币**——fork 基本用不上，沿用 infra 的 `deal` + mock 全本地化思路。
+- 复用 infra 范本：`foundry.toml`（solc/evm/viaIR/optimizer 对齐 ScratchCard 自己的 hardhat.config）、`remappings.txt`（OZ/Pyth 指 node_modules、`@greatlotto/infrastructure/` 指其 symlink、forge-std 指 lib）、`BaseTest`/`PermitHelper` 脚手架。
+- 删 `contracts/test/*.sol` 前 grep 是否被更下游引用（ScratchCard 是叶子仓，一般无下游，但仍确认）。
+
+### GreatLottoCore
+起手 prompt：
+> 参照 infrastructure 的 Foundry 迁移方案迁 GreatLottoCore。**⚠️ 本仓是 viaIR 无 optimizer**，`foundry.toml` profile 按本仓 hardhat.config 实配、不可照抄 infrastructure。先 review 现有测试与 `contracts/test/` 桩出计划。
+
+要点（与 infra 的差异，务必注意）：
+- **编译 profile 不同**：GreatLottoCore hardhat.config 是 **viaIR=true、无 optimizer**（infra 是 viaIR+optimizer 200）。`MockEntropyTest.sol` 注释已记录「未启用 optimizer 时 SDK MockEntropy 会 Stack too deep」——profile 配错会编译失败。
+- 体量更大：`PrizePool`（双账本 normalPool+rollingPool + 债务记账 + ERC4626 投资金库）、`InvestmentCoin`(GLIC ERC4626)、`GreatLottoNFT` 状态机、链上 SVG——invariant 价值更高（奖池守恒 + 债务记账 + ERC4626 份额）。
+- 该仓 `contracts/test/` 已先期清理过 3 个透传死桩（见该仓 git 历史）；迁移时按本方案再判定 mock 去留，注意其 `GreatLottoCoinTest2 is @greatlotto/infrastructure 的 GreatLottoCoinTest`（跨仓依赖，infra 侧已确认保留）。
+- 集成测试历史上 fork 以太坊主网取真实 USDT/USDC（block 22128216）——迁移时优先 `deal` 脱 fork，确认实在需要真实代币行为的用例才保留 fork。
