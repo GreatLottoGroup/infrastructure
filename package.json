@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "forge test",
+    "gas": "forge test --gas-report",
     "coverage": "forge coverage --ir-minimum --no-match-coverage test/foundry",
     "compile": "hardhat compile"
   },

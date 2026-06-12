@@ -1,6 +1,15 @@
 # Foundry 测试迁移方案（infrastructure 先行）
 
-> 状态：方案待评审 · 创建 2026-06-12 · 适用仓：先 `infrastructure`，验证后复制到 `ScratchCard` / `GreatLottoCore`
+> 状态：**infrastructure 已落地完成（commit 2c2bc1a，2026-06-12）** · 适用仓：先 `infrastructure`，验证后复制到 `ScratchCard` / `GreatLottoCore`
+>
+> **完成情况**：`test/foundry/` 共 133 tests 全绿（9 单测 + 2 invariant）；生产合约行覆盖率多在 88%+（AccessControlPartnerContract/DeadLine/SelfPermit 100%，GreatLottoCoin 96.8%、SalesChannel 96.2%、EntropyConsumerBase 94%）。**GreatLottoCoin 用 6 位 ERC20Permit mock 全本地化、未用 fork**（原 fork 计划作罢，整套 ~1.4s 零外网依赖）。
+>
+> **最终清理（含实战修正，见文末「实战修正」）**：
+> - `test/` 只剩 `test/foundry/`——`test/runTest`(8 mocha) + `test/utils` + `test/scripts`(运维脚本，部署已由 Ignition 承接) + `test/abi` + `.mocharc.json` **全部删除**。
+> - `contracts/test/` 精简到 6 个、**不能清空**：`GreatLottoCoinTest` 被 ScratchCard(`InfraImports.sol`) 与 GreatLottoCore(`GreatLottoCoinTest2.sol`) **跨仓 import** 必须留；5 个 mock（MockEntropyWithFee/Consumer/FeeOnTransfer/SilentFail/PrizePoolBaseHarness）被 Foundry 测试用必须留。仅 `PartnerTest` + `RejectingReceiver(Caller)` 是死桩已删。
+> - `hardhat.config`：去掉 mocha/coverage/standalone gas-reporter require；**`gasReporter` 保留 `enabled:true`**（toolbox 强依赖该键；但仅 hardhat test 时出数，日常 gas 用 `forge test --gas-report` / `npm run gas`）。`package.json`：`test`→`forge test`、`gas`→`forge test --gas-report`、`coverage`→`forge coverage --ir-minimum`、`compile`→`hardhat compile`。
+>
+> **复制到下游时的环境注意**：本机到 github/paradigm/soliditylang 网络不稳——solc 从 Hardhat 缓存拷进 `~/.svm/`、forge-std 用 `git clone --depth 1`（见步骤 1）。GreatLottoCore 是 **viaIR 无 optimizer**，foundry.toml profile 不可照抄 infrastructure。
 
 ## Context（为什么做）
 
@@ -104,7 +113,7 @@ test/foundry/
 
 原则：**Foundry 不消除「链上需要一个表现得像 X 的合约」这一需求**，但提供三个机制让桩缩小/消失——① 测试合约直接 `is XxxBase` 继承被测合约后**直调 internal**（无需 external wrapper）；② cheatcode（`vm.mockCall` / `vm.etch` / `deal`）；③ **测试合约本身就是合约**（可被授 PARTNER_CONTRACT_ROLE）。cheatcode 替代不了「跨调用维持 EVM 状态」的桩（有状态生命周期、与 balanceOf 耦合的记账）——这些保留为真实 mock。
 
-**净目标：`contracts/test/` 在 Foundry 方案下应清空，所有测试辅助合约迁入 `test/foundry/`（生产 `contracts/` 树只留生产合约）。**
+**净目标（已据实修正）：`contracts/test/` 尽量瘦身，但 _不可清空_——被下游跨仓 import 的 Test 合约（如 `GreatLottoCoinTest`）必须留在原路径；被 Foundry 测试 import 的 mock 也留（迁不迁进 `test/foundry/` 取决于是否要让 hardhat 停止编译它们，本仓选择留在 `contracts/test/`，hardhat 一并编译、无害）。纯 mocha 用的死桩才删。⚠️ 删任何 `contracts/test/*.sol` 前，必须 grep 下游仓 `@greatlotto/infrastructure/contracts/test/` 的 import。**
 
 | 现有桩 | 存在原因 | Foundry 处置 |
 |--------|---------|------------|
@@ -155,3 +164,15 @@ npx hardhat compile && npx hardhat ignition ... # 仍走 Hardhat
 - `out/` 与 hardhat `artifacts/` 并存：已用 `cache_path`/`out` 隔离，互不污染；interface 仍从 hardhat artifacts 取 ABI，不受影响。
 - 生产合约残留 `hardhat/console.sol` 仅靠 remapping 兜住；建议另开 follow-up change 清理 console 调用（部署字节码体积/规范性）。
 - **forge-std 不入库（`lib/` 已 gitignore），CI / checkout 后须先重装**（`forge install foundry-rs/forge-std`，断网回退 `git clone --depth 1 ... lib/forge-std`）；忘装则 `forge test` 编译 `.t.sol` 时报 forge-std 找不到。注意 `forge build` 仅编译 `contracts/`、不依赖 forge-std，故缺 forge-std 时 build 仍过、test 才挂——别被 build 通过误导。
+
+## 实战修正（infrastructure 落地后回填，下游照用）
+
+1. **`vm.expectRevert` 与带参 custom error**：`vm.expectRevert(Error.selector)`（4 字节）**只匹配无参数** revert；带参 error（如 `AccessControlUnauthorizedAccount(account, role)`、`ErrorInsufficientBalance(...)`、`ERC2612InvalidSigner(signer, owner)`）必须给完整 `abi.encodeWithSelector(Error.selector, args...)` 或 `abi.encodeWithSignature("Name(types)", args...)`，否则报「Error != expected error」。无参 error（`ErrorZeroAddress` 等）才能只给 selector。
+2. **`makeAddr` 不能在 `view` 测试里调**：它含 `vm.label`（改状态），`view` 函数内调用编译报错——去掉该测试的 `view`。
+3. **接口限定事件**：`emit IXxx.Event(...)`（0.8.22+ 支持）替代本地重声明，0.8.24 实测可用。
+4. **抽象基类**：测试合约直接 `is XxxBase` 或内联 `XxxHarness is XxxBase` 具体化；`PrizePoolBaseHarness` 已暴露全部 internal，本仓直接复用未再瘦身（够用即可，不必为「删 wrapper」改 contracts/test）。
+5. **PARTNER_CONTRACT_ROLE 授给测试合约自身**：测试合约即合约且字节码 > 1000（`_isContract` 阈值），`grantRole(PARTNER_ROLE, address(this))` 后直调 mint/mintToUser，免 `PartnerTest`。
+6. **GLC 余额用 `deal(address(glc), who, amt)`** 直接铸，免跑底层 mint 全流程；fee-on-transfer / silent-fail 异常代币复用 `contracts/test/` 现成 mock 并 `ICoinBase(address(mock))` 强转传入。
+7. **gasReporter 必须保留键**：`@nomicfoundation/hardhat-toolbox` 加载时写 `config.gasReporter.enabled`，删掉整个 `gasReporter` 配置块会 `TypeError: Cannot set properties of undefined`——保留 `gasReporter: { enabled: true }`。但它仅 hardhat test 出数，gas 实际看 `forge test --gas-report`。
+8. **删 `contracts/test/*.sol` 前必查跨仓**：infrastructure 是被 ScratchCard/Core 经 npm 包消费的上游，`grep -rn "@greatlotto/infrastructure/contracts/test/" <下游仓>/contracts`；`GreatLottoCoinTest` 即被双下游 import，删不得。
+9. **`test/scripts` 运维脚本可随 mocha 一起删**：部署由 `ignition/modules/` 承接，手写 deploy/approve/init 脚本及其 `test/utils`、`test/abi` 依赖整体废弃。

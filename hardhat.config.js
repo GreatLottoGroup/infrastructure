@@ -28,9 +28,11 @@ module.exports = {
     }
   },
 
-  // toolbox 加载时会写 config.gasReporter.enabled，需保留该键；测试已迁 Foundry，置 false。
+  // 保留 gas 报告能力（注：hardhat-gas-reporter 仅在 hardhat test 时出数；
+  // 测试已迁 Foundry，日常 gas 看 `forge test --gas-report` / `npm run gas`）。
   gasReporter: {
-    enabled: false
+    enabled: true,
+    currency: 'USD'
   },
 
   networks: {
