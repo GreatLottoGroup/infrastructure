@@ -1,7 +1,6 @@
+// Hardhat 仅负责部署（Ignition）与 ABI 产出；合约测试已迁至 Foundry（forge test）。
 require("@nomicfoundation/hardhat-toolbox");
 require('hardhat-contract-sizer');
-require('solidity-coverage');
-require("hardhat-gas-reporter");
 require('dotenv').config()
 require("@nomicfoundation/hardhat-ignition-ethers");
 
@@ -29,10 +28,10 @@ module.exports = {
     }
   },
 
+  // toolbox 加载时会写 config.gasReporter.enabled，需保留该键；测试已迁 Foundry，置 false。
   gasReporter: {
-    enabled: true,
-    currency: 'USD'
-  }, 
+    enabled: false
+  },
 
   networks: {
     hardhat: {
@@ -68,10 +67,6 @@ module.exports = {
     alphaSort: true,
     runOnCompile: true,
     disambiguatePaths: false
-  },
-
-  mocha: {
-    timeout: 1000000
   },
 
   etherscan: {
