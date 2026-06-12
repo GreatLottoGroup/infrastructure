@@ -18,12 +18,12 @@ module.exports = {
   defaultNetwork: "hardhat",
   
   solidity: {
-    version: "0.8.35",
+    version: "0.8.24",
     settings: {
       evmVersion: "cancun",
       viaIR: true,
       optimizer: {
-        enabled: false,
+        enabled: true,
         runs: 200
       }
     }
@@ -37,8 +37,8 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-        blockNumber: 22128216,
+        url: `https://arb-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        blockNumber: 472312054,
       },
       timeout: 1000000
     },

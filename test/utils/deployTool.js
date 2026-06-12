@@ -16,8 +16,7 @@ async function deploy(config) {
     coinContractName = coinContractName || 'GreatLottoCoinTest';
     // GreatLottoCoin._tokens 现为构造参数（不再硬编码）。fork 测试默认主网 USDT / USDC。
     tokens = tokens || [
-        '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT
-        '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+        '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // USDC
     ];
 
     // GreatLottoCoin 初始化

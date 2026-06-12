@@ -30,8 +30,8 @@ npx hardhat coverage --testfiles "test/runTest/*.js"
 ### 启动本地节点（分叉主网）
 
 ```shell
-# 分叉主网（GreatLottoCoin / permit 测试需要 fork）
-npx hardhat node --fork https://eth-mainnet.g.alchemy.com/v2/<ALCHEMY_API_KEY> --fork-block-number 22473100
+# arb主网 fork
+npx hardhat node --fork https://arb-mainnet.g.alchemy.com/v2/<ALCHEMY_KEY> --fork-block-number 472312054
 ```
 
 ### 部署

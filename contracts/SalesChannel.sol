@@ -8,8 +8,6 @@ import "./interfaces/ISalesChannel.sol";
 import "./base/NoDelegateCall.sol";
 import "./base/DeadLine.sol";
 
-//import "hardhat/console.sol";
-
 // 销售渠道管理合约
 contract SalesChannel is ISalesChannel, Ownable, NoDelegateCall, DeadLine{
 

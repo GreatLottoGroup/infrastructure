@@ -43,7 +43,7 @@ contract MockEntropyConsumer is EntropyConsumerBase {
         lastPostRequestSeq = sequenceNumber;
     }
 
-    function _beforeRetry(uint64 /*oldSequenceNumber*/, Request memory /*old*/) internal override {
+    function _beforeRetry(uint64 /*oldSequenceNumber*/, Request memory /*old*/) internal view override {
         if (revertOnBeforeRetry) revert("before-retry-revert");
     }
 

@@ -13,8 +13,6 @@ import "./base/SelfPermit.sol";
 import "./base/NoDelegateCall.sol";
 import "./base/AccessControlPartnerContract.sol";
 
-//import "hardhat/console.sol";
-
 // 奖池币
 contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract, NoDelegateCall, IGreatLottoCoin{
 

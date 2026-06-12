@@ -9,8 +9,6 @@ import "./interfaces/IDaoCoin.sol";
 import "./base/BeneficiaryBase.sol";
 import "./base/AccessControlPartnerContract.sol";
 
-//import "hardhat/console.sol";
-
 // 治理币合约，用于投票、分红等，购买彩票也会赠予一定数量的治理币
 // 遵循 ERC20Votes 规范
 contract DaoCoin is ERC20Votes, ERC20Permit, BeneficiaryBase, AccessControlPartnerContract, IDaoCoin{

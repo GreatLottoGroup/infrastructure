@@ -3,8 +3,6 @@ pragma solidity ^0.8.24;
 
 import "./base/BenefitPoolBase.sol";
 
-//import "hardhat/console.sol";
-
 // 利润池合约
 contract DaoBenefitPool is BenefitPoolBase{
 

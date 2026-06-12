@@ -11,8 +11,6 @@ import "../interfaces/IErrorsBase.sol";
 import "./NoDelegateCall.sol";
 import "./DeadLine.sol";
 
-//import "hardhat/console.sol";
-
 abstract contract BenefitPoolBase is DeadLine, NoDelegateCall, IBenefitPoolBase, IErrorsBase {
 
     using SafeERC20 for IERC20;
