@@ -1,6 +1,8 @@
 # Infrastructure
 
-GreatLottoGroup 平台的底层代币基础设施合约（Hardhat + Solidity 0.8.24 + OpenZeppelin v5）。
+GreatLottoGroup 平台的底层代币基础设施合约（Solidity 0.8.24 + OpenZeppelin v5）。
+
+> **工具链分工**：**测试用 Foundry**（`forge test`，含 fuzz/invariant）；**Hardhat 只管部署（Ignition）与 ABI 产出**。
 
 ## 合约一览
 
@@ -16,28 +18,22 @@ GreatLottoGroup 平台的底层代币基础设施合约（Hardhat + Solidity 0.8
 ## 常用命令
 
 ```shell
-# 编译
-npx hardhat compile
+# —— 测试（Foundry）——
+# 首次 / CI 需先装 forge-std（lib/ 已 gitignore，不入库）
+forge install foundry-rs/forge-std
 
-# 清理
+forge test                         # 全部测试（单测 + invariant）；等价 npm test
+forge test --match-path test/foundry/SalesChannel.t.sol   # 单文件
+forge test --gas-report            # gas 报告；等价 npm run gas
+forge coverage --ir-minimum --no-match-coverage test/foundry   # 覆盖率；等价 npm run coverage
+
+# —— 编译 / 部署（Hardhat）——
+npx hardhat compile                # 编译 + 产出 ABI（供下游与 interface 消费）
 npx hardhat clean
-
-# 测试（默认 fork mainnet，由 hardhat.config.js networks.hardhat.forking 提供）
-npx hardhat test test/runTest/*.js
-
-# 单文件
-npx hardhat test test/runTest/SalesChannel.js
-
-# 覆盖率
-npx hardhat coverage --testfiles "test/runTest/*.js"
 ```
 
-如需独立的 fork 节点：
-
-```shell
-# arb主网 fork
-npx hardhat node --fork https://arb-mainnet.g.alchemy.com/v2/<ALCHEMY_KEY> --fork-block-number 472312054
-```
+> 测试**全本地化、无需 fork**（底层稳定币用 6 位 ERC20Permit mock）。`test/foundry/` 含 9 单测 + 2 invariant；辅助合约在 `test/foundry/{mocks,harness}/`。
+> 注：`forge build` 不依赖 forge-std，缺它仍能编过、只有 `forge test` 报错——别被 build 通过误导。
 
 ## 部署
 
@@ -59,7 +55,7 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js --network mainnet
 
 ## 部署 Checklist
 
-1. 测试用例全绿（`npx hardhat test test/runTest/*.js`）
+1. 测试用例全绿（`forge test`）
 2. `GreatLottoCoin._tokens` 中的代币地址匹配目标链（mainnet vs sepolia 注释切换）
 3. `.env` 中 `OWNER_ADDRESS` / `DEPLOY_ACCOUNT_PRIVATE_KEY` 已配置
 4. `ignition/modules/infrastructure.js` 切换为生产合约（默认部署的是 `*Test` 变种）

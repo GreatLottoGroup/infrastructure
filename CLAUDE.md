@@ -8,30 +8,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 常用命令
 
-### 开发
+> **工具链分工**：**测试 = Foundry**（`forge test`，合约测试在 `test/foundry/`，含 fuzz/invariant，全本地化无需 fork）；**Hardhat 只管部署（Ignition）+ ABI 产出**。`hardhat test`/`hardhat coverage` 已停用，mocha 测试已删除。
+
+### 测试（Foundry）
 
 ```shell
-# 编译合约
-npx hardhat compile
+# 首次 / CI 需先装 forge-std（lib/ 已 gitignore，不入库；断网回退 git clone --depth 1）
+forge install foundry-rs/forge-std
 
-# 清除编译产物
-npx hardhat clean
-
-# 运行全部测试
-npx hardhat test test/runTest/*.js
-
-# 运行单个测试文件
-npx hardhat test test/runTest/SalesChannel.js
-
-# 覆盖率报告
-npx hardhat coverage --testfiles "test/runTest/*.js"
+forge test                       # 全部（9 单测 + 2 invariant）；= npm test
+forge test --match-path test/foundry/PrizePoolBase.t.sol   # 单文件
+forge test --gas-report          # gas 报告；= npm run gas
+forge coverage --ir-minimum --no-match-coverage test/foundry   # 覆盖率；= npm run coverage
 ```
 
-### 启动本地节点（分叉主网）
+- 测试目录：`test/foundry/`（`base/` 脚手架 BaseTest+PermitHelper、`mocks/` 外部依赖模拟、`harness/` 抽象基类具体化、`invariant/` 不变量）。
+- 约定：命名 `test_<func>_<场景>`；事件用接口限定 `emit IXxx.Event(...)`；带参 custom error 的 `vm.expectRevert` 必须给完整 `abi.encodeWithSelector(.., args)`；PARTNER_CONTRACT_ROLE 授给测试合约自身；GLC 余额用 `deal`。完整实践见 [doc/foundry-test-migration-plan.md](doc/foundry-test-migration-plan.md)。
+
+### 编译
 
 ```shell
-# arb主网 fork
-npx hardhat node --fork https://arb-mainnet.g.alchemy.com/v2/<ALCHEMY_KEY> --fork-block-number 472312054
+npx hardhat compile   # 编译 + 产出 ABI（供下游 ScratchCard/Core 与 interface 消费）
+npx hardhat clean
 ```
 
 ### 部署
@@ -76,7 +74,7 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitru
 
 **受益人分润机制**：`DaoCoin` 继承 `BeneficiaryBase`，后者通过重写 `_update` 钩子自动维护持有量 ≥ 10,000 GLDC 的受益人列表。调用 `DaoBenefitPool.executeBenefit(deadline)` 时，合约内全部 GLC 余额将按持仓比例分发给当前受益人。
 
-**测试合约**：`contracts/test/` 中的 `GreatLottoCoinTest`（加 `mintFor` 等测试入口）和 `PartnerTest`。支持的代币地址现由构造参数传入（见「代币地址配置」），不再靠 `*Test` 改源码覆盖。`ignition/modules/infrastructure.js` 当前部署的是 `*Test` 版本，**主网部署前须切换为生产合约**。
+**测试合约**：`contracts/test/` 现**只保留 `GreatLottoCoinTest`**（加 `mintFor`/`burnFrom` 测试入口，构造签名与 `GreatLottoCoin` 一致）——它被下游 ScratchCard（`InfraImports.sol`）与 GreatLottoCore（`GreatLottoCoinTest2.sol`）**跨仓 import**，是发布给下游的 Test 合约、必须留原路径。其余测试辅助合约（MockEntropyWithFee/FeeOnTransfer/SilentFail、MockEntropyConsumer、PrizePoolBaseHarness）只服务本仓 Foundry 测试，已迁入 `test/foundry/{mocks,harness}/`，hardhat 不再编译。`ignition/modules/infrastructure.js` 当前部署的是 `*Test` 版本，**主网部署前须切换为生产合约**。⚠️ 删/迁 `contracts/test/*.sol` 前必须 grep 下游仓的 `@greatlotto/infrastructure/contracts/test/` import。
 
 ### 基础合约层级
 
@@ -93,6 +91,6 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitru
 
 支持的稳定币地址由 **构造参数** `GreatLottoCoin(address[] tokensAddress_, address owner_)` 在部署时传入（不再硬编码在 `_tokens` 源码中）。按部署网络在部署脚本里传对应地址数组：
 - `ignition/modules/infrastructure.js` 顶部 `supportedTokens` 常量（默认主网 USDT / USDC，测试网请替换）。
-- 测试 fork 默认值在 `test/utils/deployTool.js` 的 `deploy()`（可经 `config.tokens` 覆盖）。
+- Foundry 测试里在各 `setUp()` 用 6 位 `MockERC20Permit` 作底层稳定币显式传入（全本地化，不依赖真实代币 / fork）。
 
 `GreatLottoCoinTest` 仅在父构造参数之外加 `mintFor` 等测试入口，构造签名与 `GreatLottoCoin` 一致（`(address[] tokensAddress_, address owner_)`）。
