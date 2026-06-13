@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"          # 工作区根(4 仓父目录)
+SYNC="$SCRIPT_DIR/sync-addresses.mjs"
+RPC="http://127.0.0.1:8545"
+NODE_PID=""
+
+log(){ printf '\033[1;34m[deploy-local]\033[0m %s\n' "$*"; }
+die(){ printf '\033[1;31m[deploy-local] 错误:\033[0m %s\n' "$*" >&2; exit 1; }
+cleanup(){ [ -n "$NODE_PID" ] && kill "$NODE_PID" 2>/dev/null || true; }
+trap 'code=$?; if [ "$code" -ne 0 ]; then log "失败(exit $code),拆除本地节点"; cleanup; fi' EXIT
+trap 'die "用户中断"' INT
+
+# 1) 预检:下游两仓 infrastructure 软链接在位
+for repo in ScratchCard GreatLottoCore; do
+  [ -e "$ROOT/$repo/node_modules/@greatlotto/infrastructure" ] \
+    || die "$repo 缺 @greatlotto/infrastructure 软链接;在该仓跑 pnpm i 或 npm link @greatlotto/infrastructure"
+done
+
+# 2) 清三仓 chain-31337 旧部署(新链 ⇒ 旧 journal 会冲突)
+for repo in infrastructure ScratchCard GreatLottoCore; do
+  rm -rf "$ROOT/$repo/ignition/deployments/chain-31337"
+done
+log "已清理三仓 chain-31337 旧部署"
+
+# 3) 起本地链(由 infrastructure 起,任一仓 hardhat node 都是同一条 31337)
+log "启动 hardhat node..."
+( cd "$ROOT/infrastructure" && npx hardhat node ) >"$SCRIPT_DIR/.hardhat-node.log" 2>&1 &
+NODE_PID=$!
+for i in $(seq 1 30); do
+  if curl -s -X POST "$RPC" -H 'content-type: application/json' \
+       --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' 2>/dev/null | grep -q '0x7a69'; then
+    break
+  fi
+  sleep 1
+  [ "$i" -eq 30 ] && die "hardhat node 30s 未就绪,见 $SCRIPT_DIR/.hardhat-node.log"
+done
+log "本地链就绪 (pid $NODE_PID, chainId 31337)"
+
+# 4) 部署 infrastructure
+log "部署 infrastructure..."
+( cd "$ROOT/infrastructure" && npx hardhat ignition deploy ignition/modules/infrastructure.js \
+    --network localhost --parameters ignition/parameters/localhost.json --reset )
+
+# 5) 同步 infra 地址 → ScratchCard/Core 的 localhost.json
+node "$SYNC" --network localhost --write --only sc,core
+
+# 6) 部署 ScratchCardLocal + GreatLottoCoreLocal
+log "部署 ScratchCardLocal..."
+( cd "$ROOT/ScratchCard" && npx hardhat ignition deploy ignition/modules/ScratchCardLocal.js \
+    --network localhost --parameters ignition/parameters/localhost.json --reset )
+log "部署 GreatLottoCoreLocal..."
+( cd "$ROOT/GreatLottoCore" && npx hardhat ignition deploy ignition/modules/GreatLottoCoreLocal.js \
+    --network localhost --parameters ignition/parameters/localhost.json --reset )
+
+# 7) 同步三仓地址 → interface address.json[31337](含 MockEntropy)
+node "$SYNC" --network localhost --write --only interface
+
+# 8) 收尾:节点保留运行(interface dev 需要)
+log "完成 ✅  本地链保留运行 (pid $NODE_PID)"
+log "停止本地链: kill $NODE_PID"
+trap - EXIT     # 正常结束不触发拆链
