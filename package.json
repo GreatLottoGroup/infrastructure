@@ -7,7 +7,7 @@
     "test": "forge test",
     "gas": "forge test --gas-report",
     "coverage": "forge coverage --report summary",
-    "test:scripts": "node --test scripts/test/",
+    "test:scripts": "node --test \"scripts/test/**/*.test.mjs\"",
     "compile": "hardhat compile"
   },
   "repository": {
