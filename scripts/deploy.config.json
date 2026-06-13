@@ -1,0 +1,60 @@
+{
+  "networks": {
+    "localhost":       { "chainId": 31337,  "scModule": "ScratchCardLocalModule", "coreModule": "GreatLottoCoreLocal", "local": true },
+    "baseSepolia":     { "chainId": 84532,  "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
+    "arbitrumSepolia": { "chainId": 421614, "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
+    "base":            { "chainId": 8453,   "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
+    "arbitrum":        { "chainId": 42161,  "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false }
+  },
+  "repos": {
+    "infrastructure": "infrastructure",
+    "scratchcard":    "ScratchCard",
+    "core":           "GreatLottoCore",
+    "interfaceAddressFile": "interface/src/app/launch/address.json"
+  },
+  "mappings": [
+    { "logical": "GreatLottoCoin", "source": "infrastructure",
+      "keys": ["Infrastructure#GreatLottoCoinTest", "Infrastructure#GreatLottoCoin"],
+      "targets": { "scParam": "greatLottoCoinAddress", "coreParam": "greatLottoCoinAddress", "interface": "contracts.GreatCoinContractAddress" } },
+    { "logical": "DaoCoin", "source": "infrastructure",
+      "keys": ["Infrastructure#DaoCoin"],
+      "targets": { "scParam": "daoCoinAddress", "coreParam": "daoCoinAddress", "interface": "contracts.DaoCoinContractAddress" } },
+    { "logical": "DaoBenefitPool", "source": "infrastructure",
+      "keys": ["Infrastructure#DaoBenefitPool"],
+      "targets": { "scParam": "daoBenefitPoolAddress", "coreParam": "daoBenefitPoolAddress", "interface": "contracts.DaoBenefitPoolContractAddress" } },
+    { "logical": "SalesChannel", "source": "infrastructure",
+      "keys": ["Infrastructure#SalesChannel"],
+      "targets": { "scParam": "salesChannelAddress", "coreParam": "salesChannelAddress", "interface": "contracts.SalesChannelContractAddress" } },
+
+    { "logical": "ScratchCard", "source": "scratchcard",
+      "keys": ["ScratchCardLocalModule#ScratchCard", "ScratchCardModule#ScratchCard"],
+      "targets": { "interface": "contracts.ScratchCardContractAddress" } },
+    { "logical": "ScratchCardNFT", "source": "scratchcard",
+      "keys": ["ScratchCardLocalModule#ScratchCardNFT", "ScratchCardModule#ScratchCardNFT"],
+      "targets": { "interface": "contracts.ScratchCardNFTContractAddress" } },
+
+    { "logical": "GreatLotto", "source": "core",
+      "keys": ["GreatLottoCoreLocal#GreatLotto", "GreatLottoCore#GreatLotto"],
+      "targets": { "interface": "contracts.GreatLottoContractAddress" } },
+    { "logical": "GreatLottoNFT", "source": "core",
+      "keys": ["GreatLottoCoreLocal#GreatLottoNFT", "GreatLottoCore#GreatLottoNFT"],
+      "targets": { "interface": "contracts.GreatNftContractAddress" } },
+    { "logical": "CorePrizePool", "source": "core",
+      "keys": ["GreatLottoCoreLocal#PrizePool", "GreatLottoCore#PrizePool"],
+      "targets": { "interface": "contracts.PrizePoolContractAddress" } },
+    { "logical": "InvestmentCoin", "source": "core",
+      "keys": ["GreatLottoCoreLocal#InvestmentCoin", "GreatLottoCore#InvestmentCoin"],
+      "targets": { "interface": "contracts.InvestmentCoinContractAddress" } },
+    { "logical": "InvestmentBenefitPool", "source": "core",
+      "keys": ["GreatLottoCoreLocal#InvestmentBenefitPool", "GreatLottoCore#InvestmentBenefitPool"],
+      "targets": { "interface": "contracts.InvestmentBenefitPoolContractAddress" } }
+  ],
+  "entropy": {
+    "interfaceAddressKey": "entropy.entropyAddress",
+    "interfaceProviderKey": "entropy.entropyProvider",
+    "local":  { "addressFromDeployed": { "source": "scratchcard", "keys": ["ScratchCardLocalModule#MockEntropy"] },
+                "providerFromScParam": "entropyProvider" },
+    "remote": { "addressFromScParam": "entropyAddress",
+                "providerFromScParam": "entropyProvider" }
+  }
+}
