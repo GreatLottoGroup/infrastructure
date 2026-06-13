@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   parseArgs, resolveNetwork, isEmptyAddr,
   resolveContractAddresses, resolveEntropy,
+  buildDiffs, applyDiffs, formatDiffs, getPath,
 } from "../sync-core.mjs";
 
 const CONFIG = {
@@ -87,4 +88,53 @@ test("resolveEntropy: 非本地从 scParam 读 address+provider", () => {
   const { entropyAddress, entropyProvider } = resolveEntropy(CONFIG, net, {}, scParamMod);
   assert.equal(entropyAddress, "0xPyth");
   assert.equal(entropyProvider, "0xProv");
+});
+
+test("buildDiffs: 仅对变化字段产出 diff,跳过空 newValue 与同值", () => {
+  const net = resolveNetwork(CONFIG, "localhost");
+  const resolved = { GreatLottoCoin: "0xCoin", ScratchCard: "0xSC" };
+  const targets = {
+    scParam: { ScratchCardLocalModule: { greatLottoCoinAddress: "0xOLD" } },
+    core: { GreatLottoCoreLocal: {} },
+    interface: { "31337": { contracts: { GreatCoinContractAddress: "0xCoin", ScratchCardContractAddress: "" }, entropy: {} } },
+  };
+  const entropy = { entropyAddress: "0xMock", entropyProvider: "0x0000000000000000000000000000000000000001" };
+  const diffs = buildDiffs({ config: CONFIG, network: net, resolved, entropy, targets, only: null });
+  const labels = diffs.map((d) => d.label);
+  assert.ok(labels.some((l) => l.includes("greatLottoCoinAddress")));
+  assert.ok(!labels.some((l) => l.includes("GreatCoinContractAddress")));
+  assert.ok(labels.some((l) => l.includes("ScratchCardContractAddress")));
+  assert.ok(labels.some((l) => l.includes("entropyAddress")));
+});
+
+test("buildDiffs: --only 过滤目的地", () => {
+  const net = resolveNetwork(CONFIG, "localhost");
+  const resolved = { GreatLottoCoin: "0xCoin" };
+  const targets = {
+    scParam: { ScratchCardLocalModule: { greatLottoCoinAddress: "" } },
+    core: { GreatLottoCoreLocal: {} },
+    interface: { "31337": { contracts: { GreatCoinContractAddress: "" }, entropy: {} } },
+  };
+  const diffs = buildDiffs({ config: CONFIG, network: net, resolved, entropy: null, targets, only: ["sc"] });
+  assert.ok(diffs.every((d) => d.scope === "sc"));
+});
+
+test("applyDiffs: 按 scope+path 写回,保留其它 key", () => {
+  const targets = {
+    scParam: { ScratchCardLocalModule: { greatLottoCoinAddress: "0xOLD", owner: "0xOwner" } },
+    core: {}, interface: {},
+  };
+  const diffs = [{ scope: "sc", path: ["ScratchCardLocalModule", "greatLottoCoinAddress"], oldValue: "0xOLD", newValue: "0xNEW", label: "x" }];
+  applyDiffs(targets, diffs);
+  assert.equal(targets.scParam.ScratchCardLocalModule.greatLottoCoinAddress, "0xNEW");
+  assert.equal(targets.scParam.ScratchCardLocalModule.owner, "0xOwner");
+});
+
+test("getPath: 字符串路径读取(interface 用)", () => {
+  const obj = { "31337": { contracts: { ScratchCardContractAddress: "0xSC" } } };
+  assert.equal(getPath(obj, ["31337", "contracts", "ScratchCardContractAddress"]), "0xSC");
+});
+
+test("formatDiffs: 无变化返回占位", () => {
+  assert.equal(formatDiffs([]), "(无变化)");
 });
