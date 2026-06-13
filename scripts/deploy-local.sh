@@ -5,11 +5,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"          # 工作区根(4 仓父目录)
 SYNC="$SCRIPT_DIR/sync-addresses.mjs"
 RPC="http://127.0.0.1:8545"
-NODE_PID=""
+NODE_PID=""        # 后台子 shell 的 pid(起链前用于早期失败拆链)
+LISTEN_PID=""      # 真正监听 8545 的 hardhat node pid(就绪后解析,用于收尾/拆链)
 
 log(){ printf '\033[1;34m[deploy-local]\033[0m %s\n' "$*"; }
 die(){ printf '\033[1;31m[deploy-local] 错误:\033[0m %s\n' "$*" >&2; exit 1; }
-cleanup(){ [ -n "$NODE_PID" ] && kill "$NODE_PID" 2>/dev/null || true; }
+# 杀真实监听进程(它退出会带走包裹它的子 shell);兜底再杀子 shell。
+cleanup(){
+  [ -n "$LISTEN_PID" ] && kill "$LISTEN_PID" 2>/dev/null || true
+  [ -n "$NODE_PID" ] && kill "$NODE_PID" 2>/dev/null || true
+}
 trap 'code=$?; if [ "$code" -ne 0 ]; then log "失败(exit $code),拆除本地节点"; cleanup; fi' EXIT
 trap 'die "用户中断"' INT
 
@@ -37,7 +42,9 @@ for i in $(seq 1 30); do
   sleep 1
   [ "$i" -eq 30 ] && die "hardhat node 30s 未就绪,见 $SCRIPT_DIR/.hardhat-node.log"
 done
-log "本地链就绪 (pid $NODE_PID, chainId 31337)"
+# npx → hardhat → node 多层,真正监听 8545 的是孙进程;解析其 pid 供收尾/拆链使用。
+LISTEN_PID="$(lsof -i:8545 -sTCP:LISTEN -t 2>/dev/null | head -1)"
+log "本地链就绪 (pid ${LISTEN_PID:-$NODE_PID}, chainId 31337)"
 
 # 4) 部署 infrastructure
 log "部署 infrastructure..."
@@ -59,6 +66,7 @@ log "部署 GreatLottoCoreLocal..."
 node "$SYNC" --network localhost --write --only interface
 
 # 8) 收尾:节点保留运行(interface dev 需要)
-log "完成 ✅  本地链保留运行 (pid $NODE_PID)"
-log "停止本地链: kill $NODE_PID"
+STOP_PID="${LISTEN_PID:-$NODE_PID}"
+log "完成 ✅  本地链保留运行 (pid $STOP_PID)"
+log "停止本地链: kill $STOP_PID   (兜底: pkill -f 'hardhat node')"
 trap - EXIT     # 正常结束不触发拆链
