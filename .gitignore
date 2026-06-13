@@ -26,3 +26,6 @@ ignition/deployments
 # foreign build / lock artifacts (project uses npm + hardhat, not pnpm/next)
 pnpm-lock.yaml
 pnpm-workspace.yaml
+
+# 本地一键部署的 hardhat node 运行日志
+scripts/.hardhat-node.log
