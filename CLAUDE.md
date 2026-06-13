@@ -19,7 +19,7 @@ forge install foundry-rs/forge-std
 forge test                       # 全部（9 单测 + 2 invariant）；= npm test
 forge test --match-path test/foundry/PrizePoolBase.t.sol   # 单文件
 forge test --gas-report          # gas 报告；= npm run gas
-forge coverage --ir-minimum --no-match-coverage test/foundry   # 覆盖率；= npm run coverage
+forge coverage --report summary   # 覆盖率；= npm run coverage
 ```
 
 - 测试目录：`test/foundry/`（`base/` 脚手架 BaseTest+PermitHelper、`mocks/` 外部依赖模拟、`harness/` 抽象基类具体化、`invariant/` 不变量）。
@@ -34,25 +34,27 @@ npx hardhat clean
 
 ### 部署
 
+> 部署参数走 Ignition 参数文件（`ignition/parameters/<network>.json`，每条链一份；`owner` / `supportedTokens` 不再读 `.env`）。
+
 ```shell
-# 部署到本地
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network localhost
+# 部署到本地（先 `anvil` 或 `npx hardhat node`）
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network localhost --parameters ignition/parameters/localhost.json
 
-# 部署到测试网（首发链 Base / Arbitrum，见 hardhat.config.js networks）
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network baseSepolia --reset --verify
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrumSepolia --reset --verify
+# 测试网（首发链 Base / Arbitrum，见 hardhat.config.js networks）
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network baseSepolia --parameters ignition/parameters/baseSepolia.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrumSepolia --parameters ignition/parameters/arbitrumSepolia.json --reset --verify
 
-# 主网
-# Mainnet（生产前需将 ignition 模块改为部署 GreatLottoCoin 而非 GreatLottoCoinTest）
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network base --reset --verify
-npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrum --reset --verify
+# 主网（生产前需将 ignition 模块改为部署 GreatLottoCoin 而非 GreatLottoCoinTest）
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network base --parameters ignition/parameters/base.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrum --parameters ignition/parameters/arbitrum.json --reset --verify
 ```
 
 ### 环境变量（`.env`）
 
+`.env` 仅保留 RPC / 部署账号 / 验证密钥；`owner` / `supportedTokens` 已迁至 `ignition/parameters/`。
+
 - `ALCHEMY_API_KEY` — Alchemy API Key，用于所有 RPC 节点及默认 hardhat 分叉
 - `DEPLOY_ACCOUNT_PRIVATE_KEY` — 部署账户私钥
-- `OWNER_ADDRESS` — 合约部署时传入的管理员地址
 - `BASESCAN_API_KEY` — Base 主网 / Base Sepolia 合约验证
 - `ARBISCAN_API_KEY` — Arbitrum One / Arbitrum Sepolia 合约验证
 
@@ -91,7 +93,7 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitru
 ### 代币地址配置
 
 支持的稳定币地址由 **构造参数** `GreatLottoCoin(address[] tokensAddress_, address owner_)` 在部署时传入（不再硬编码在 `_tokens` 源码中）。按部署网络在部署脚本里传对应地址数组：
-- `ignition/modules/infrastructure.js` 顶部 `supportedTokens` 常量（默认主网 USDT / USDC，测试网请替换）。
+- `ignition/parameters/<network>.json` 的 `supportedTokens` 数组（按目标链填；测试网 / 本地留空 `[]`）。
 - Foundry 测试里在各 `setUp()` 用 6 位 `MockERC20Permit` 作底层稳定币显式传入（全本地化，不依赖真实代币 / fork）。
 
 `GreatLottoCoinTest` 仅在父构造参数之外加 `mintFor` 等测试入口，构造签名与 `GreatLottoCoin` 一致（`(address[] tokensAddress_, address owner_)`）。

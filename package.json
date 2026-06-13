@@ -6,7 +6,7 @@
   "scripts": {
     "test": "forge test",
     "gas": "forge test --gas-report",
-    "coverage": "forge coverage --ir-minimum --no-match-coverage test/foundry",
+    "coverage": "forge coverage --report summary",
     "compile": "hardhat compile"
   },
   "repository": {

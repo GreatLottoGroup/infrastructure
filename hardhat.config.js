@@ -42,6 +42,12 @@ module.exports = {
       },
       timeout: 1000000
     },
+    // 本地节点（chainId 31337，先 `anvil` 或 `npx hardhat node` 起一个本地链）。
+    // 账户用本地节点内置的解锁账号，无需 .env 私钥。
+    localhost: {
+        url: "http://127.0.0.1:8545",
+        chainId: 31337,
+    },
     base: {
         url: `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
         chainId: 8453,
