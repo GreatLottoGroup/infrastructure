@@ -8,6 +8,8 @@
 | `deploy.config.json` | 网络注册表 + 地址映射(加链/加合约只改这里) |
 | `sync-core.mjs` | 纯函数核心(单测覆盖) |
 | `sync-addresses.mjs` | 地址同步 CLI |
+| `sync-abi.mjs` | ABI 同步 CLI(三仓 artifact → interface) |
+| `abi.config.json` | ABI 映射(加/改合约 abi 改这里) |
 | `deploy-local.sh` | 一键本地部署(仅 31337) |
 
 > 路径基准:脚本以**工作区根**(`infrastructure/` 的上级、4 仓父目录)为基准访问 ScratchCard / GreatLottoCore / interface。
@@ -47,6 +49,29 @@ node scripts/sync-addresses.mjs --network localhost --write --only interface
 - `--network` 接受网络名(`localhost`/`baseSepolia`/…)或 chainId(`31337`/`84532`/…)。
 
 典型测试网流程:先 `ignition deploy` 三仓 → 再 `node scripts/sync-addresses.mjs --network <net> --write` 回填下游参数与 interface。
+
+## 单独跑 ABI 同步
+
+把三仓 hardhat 编译产物(`artifacts/`)里的合约 ABI 抽取(只取 `.abi` 数组)写到 `interface/src/app/abi/`。
+
+```bash
+# dry-run(默认):打印每文件状态(新建/变更/无变化/缺失/孤儿),不写
+node scripts/sync-abi.mjs
+
+# 落盘
+node scripts/sync-abi.mjs --write
+
+# 非本地变体(影响 GreatLottoCoin:base/arbitrum 取生产合约,localhost 取 Test)
+node scripts/sync-abi.mjs --network base --write
+```
+
+- `--network` 可选,默认 `localhost`,**仅影响带变体的 mapping(目前只有 `GreatLottoCoin`)**;其余合约 ABI 与网络无关。
+- 前置:对应仓已 `npx hardhat compile`(artifact 缺失会告警并跳过该文件)。`deploy-local.sh` 里 `ignition deploy` 已隐式编译,故一键流程无需额外编译。
+- **孤儿告警**:abi 目录里既不在 `abi.config.json` 映射、又不在 `external` 白名单的文件(历史死件,如 `Callable.json`)会被列出,**只报告不删**。
+
+### 加 / 改一个合约 ABI
+
+改 `abi.config.json` 的 `mappings`:`file`(interface 目标文件名)+ `source`(`scratchcard`/`core`/`infrastructure`)+ `artifact`(`artifacts/` 下相对路径,不含 `.json`)。有 Test/生产变体的用 `variants.{local,remote}` 代替 `artifact`。
 
 ## 加一条链 / 加一个合约
 

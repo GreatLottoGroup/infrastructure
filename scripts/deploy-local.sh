@@ -65,6 +65,10 @@ log "部署 GreatLottoCoreLocal..."
 # 7) 同步三仓地址 → interface address.json[31337](含 MockEntropy)
 node "$SYNC" --network localhost --write --only interface
 
+# 7b) 同步三仓 ABI → interface(本地变体:GLC=GreatLottoCoinTest)
+log "同步 ABI → interface..."
+node "$SCRIPT_DIR/sync-abi.mjs" --network localhost --write
+
 # 8) 收尾:节点保留运行(interface dev 需要)
 STOP_PID="${LISTEN_PID:-$NODE_PID}"
 log "完成 ✅  本地链保留运行 (pid $STOP_PID)"
