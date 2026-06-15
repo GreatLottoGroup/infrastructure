@@ -19,7 +19,6 @@ interface IErrorsBase {
      * @dev Errors: Insufficient balance
      */
     error ErrorInsufficientBalance(address token, address account, uint balance, uint amount);
-    error ErrorInsufficientBalanceEth(address account, uint balance, uint amount);
 
     /**
      * @dev Errors: The address is 0
