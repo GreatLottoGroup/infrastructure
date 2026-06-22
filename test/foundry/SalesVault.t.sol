@@ -6,13 +6,15 @@ import {SalesVault} from "../../contracts/SalesVault.sol";
 import {GreatLottoCoin} from "../../contracts/GreatLottoCoin.sol";
 import {MockERC20Permit} from "./mocks/MockERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 /// @title SalesVaultTest
 /// @notice 覆盖 SalesVault（ERC4626 销售金库）：
 ///         初始铸满 1 亿 / 资产币对齐 / 分润转入抬升单份额价值 / redeem 按比例 / 份额可转让 /
 ///         1 亿硬上限（初始即满→deposit revert、redeem 后可 deposit、maxDeposit/maxMint 换算）/
 ///         offset=6 防 inflation attack（大额 redeem→supply 极低→恶意 deposit+捐赠→正常存入不被吞）/
-///         纯无特权（无 topUp/sweep 入口——编译期保证，运行期断言无管理员函数）。
+///         adminMint（owner 持 DEFAULT_ADMIN_ROLE 在 1 亿硬上限内免费增铸——满额 revert/腾额后可铸/
+///         超额 revert/非 admin revert）；仍无 adminBurn/sweep/pause 资金后门。
 contract SalesVaultTest is BaseTest {
     SalesVault internal vault;
     GreatLottoCoin internal glc;
@@ -248,5 +250,95 @@ contract SalesVaultTest is BaseTest {
         // owner 持有份额对应资产不因 alice 现价申购而下降（容许 ≤1 wei 取整误差）
         uint256 ownerValueAfter = vault.convertToAssets(vault.balanceOf(owner));
         assertGe(ownerValueAfter + 1, ownerValueBefore);
+    }
+
+    // ---------------------------------------------------------------------
+    // adminMint：1 亿硬上限内免费增铸（持有人 redeem 腾额后补回股权）
+    // ---------------------------------------------------------------------
+
+    function test_constructor_grantsAdminRoleToOwner() public view {
+        assertTrue(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), owner));
+        assertFalse(vault.hasRole(vault.DEFAULT_ADMIN_ROLE(), alice));
+    }
+
+    function test_adminMint_revert_whenFull() public {
+        // 部署即满额 → maxMint==0 → 任何增铸 revert
+        assertEq(vault.maxMint(alice), 0);
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626.ERC4626ExceededMaxMint.selector, alice, 1e18, 0)
+        );
+        vault.adminMint(1e18, alice);
+    }
+
+    function test_adminMint_succeeds_inFreedRoom() public {
+        // owner 赎 10% 腾出额度
+        deal(address(glc), address(vault), 1_000e18);
+        uint256 redeemShares = MAX_SHARES / 10;
+        vm.prank(owner);
+        vault.redeem(redeemShares, owner, owner);
+
+        uint256 room = vault.maxMint(alice);
+        assertEq(room, redeemShares);
+
+        // admin 免费增铸给 alice（不收 GLC）
+        uint256 aliceGlcBefore = glc.balanceOf(alice);
+        vm.prank(owner);
+        vault.adminMint(room, alice);
+
+        assertEq(vault.balanceOf(alice), room);
+        assertEq(glc.balanceOf(alice), aliceGlcBefore); // 未收取任何对价
+        assertEq(vault.totalSupply(), MAX_SHARES); // 补回到满额
+    }
+
+    function test_adminMint_revert_whenExceedsRoom() public {
+        deal(address(glc), address(vault), 1_000e18);
+        uint256 redeemShares = MAX_SHARES / 10;
+        vm.prank(owner);
+        vault.redeem(redeemShares, owner, owner);
+
+        uint256 room = vault.maxMint(alice); // == redeemShares
+        uint256 supplyBefore = vault.totalSupply();
+
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(ERC4626.ERC4626ExceededMaxMint.selector, alice, room + 1, room)
+        );
+        vault.adminMint(room + 1, alice);
+
+        assertEq(vault.totalSupply(), supplyBefore); // 超额未改变 supply
+    }
+
+    function test_adminMint_revert_whenNotAdmin() public {
+        // 腾出额度，排除「满额 revert」干扰，确证 revert 来自权限
+        deal(address(glc), address(vault), 1_000e18);
+        vm.prank(owner);
+        vault.redeem(MAX_SHARES / 10, owner, owner);
+
+        bytes32 adminRole = vault.DEFAULT_ADMIN_ROLE();
+        vm.prank(alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                alice,
+                adminRole
+            )
+        );
+        vault.adminMint(1e18, alice);
+    }
+
+    function testFuzz_adminMint_neverExceedsCap(uint256 redeemFrac, uint256 mintShares) public {
+        redeemFrac = bound(redeemFrac, 1, MAX_SHARES - 1);
+        deal(address(glc), address(vault), 1_000e18);
+        vm.prank(owner);
+        vault.redeem(redeemFrac, owner, owner);
+
+        uint256 room = vault.maxMint(alice);
+        mintShares = bound(mintShares, 0, room);
+
+        vm.prank(owner);
+        vault.adminMint(mintShares, alice);
+
+        assertLe(vault.totalSupply(), MAX_SHARES);
     }
 }

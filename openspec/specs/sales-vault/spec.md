@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`SalesVault` 是承载销售利润的 ERC4626 金库：底层资产币为 GLC，份额固定硬上限 1 亿，部署时一次性全部铸给 owner。销售分润不再「遍历受益人主动打款」，而是由 `PrizePoolBase` 经标准 `transfer` 把 GLC 打入金库地址——抬高 `totalAssets` 而不动 `totalSupply`，使每份额对应资产按比例自动增值。金库对所有份额持有人无门槛开放标准 `redeem`/`withdraw`，并开放公众现价 `deposit`/`mint`（受 1 亿硬上限约束、`_decimalsOffset()=6` 防 inflation attack），份额可自由二级流转。金库纯无特权（无 `Ownable`/`AccessControl`、无任何 owner 后门），取代旧 `DaoBenefitPool` 的主动分发模型。
+`SalesVault` 是承载销售利润的 ERC4626 金库：底层资产币为 GLC，份额固定硬上限 1 亿，部署时一次性全部铸给 owner。销售分润不再「遍历受益人主动打款」，而是由 `PrizePoolBase` 经标准 `transfer` 把 GLC 打入金库地址——抬高 `totalAssets` 而不动 `totalSupply`，使每份额对应资产按比例自动增值。金库对所有份额持有人无门槛开放标准 `redeem`/`withdraw`，并开放公众现价 `deposit`/`mint`（受 1 亿硬上限约束、`_decimalsOffset()=6` 防 inflation attack），份额可自由二级流转，取代旧 `DaoBenefitPool` 的主动分发模型。金库继承 `AccessControl`，owner 持 `DEFAULT_ADMIN_ROLE`，唯一特权入口 `adminMint` 可在 1 亿硬上限内免费增铸份额（用于持有人 `redeem` 烧份额后补回股权）；除此之外无 `adminBurn`/没收、无 `sweep`/`rescue` 资金后门、无 `pause`。
 
 ## Requirements
 
@@ -111,16 +111,51 @@
 - **THEN** 正常用户获得的份额 MUST NOT 因取整被吞为 0（virtual shares 吸收取整误差）
 - **AND** 攻击者 MUST NOT 通过该序列净获利
 
-### Requirement: 纯无特权——无 owner 后门
+### Requirement: admin 受上限约束增铸份额
 
-`SalesVault` SHALL NOT 继承 `Ownable` / `AccessControl`，SHALL NOT 暴露任何 owner/admin 专属入口（无 `topUp` 补铸、无 `sweep`、无 `pause`）。owner 的唯一特殊性是部署时获得全部初始份额；运行期 owner 与任意份额持有人等权。
+`SalesVault` SHALL 继承 OpenZeppelin `AccessControl`，构造时 SHALL `_grantRole(DEFAULT_ADMIN_ROLE, owner_)`，使 `owner_` 成为唯一初始管理员（构造仍 `_mint(owner_, MAX_SHARES)`，`MAX_SHARES` 不变）。
 
-#### Scenario: 无特权增发入口
+`SalesVault` SHALL 暴露 `adminMint(uint256 shares, address receiver)`（参数顺序对齐 ERC4626 `mint(shares, receiver)`），`onlyRole(DEFAULT_ADMIN_ROLE)`。该函数 SHALL 在铸造前以 `maxMint(receiver)` 校验额度：当 `shares > maxMint(receiver)` 时 MUST revert（`ERC4626ExceededMaxMint`），否则 `_mint(receiver, shares)`。因此 `adminMint` SHALL NOT 使 `totalSupply()` 超过 `MAX_SHARES`，即 admin 增铸受与公众申购同一条 1 亿硬上限约束；满额时 `adminMint` MUST revert。
+
+`adminMint` 是免费铸造（不收取 `receiver` 任何对价），仅由 `redeem` 腾出额度后用于把份额补回，实现「持有人提收益（烧份额）后不丧失股权」。
+
+金库除 `adminMint` 外 SHALL NOT 暴露其他 owner/admin 专属入口：SHALL NOT 存在绕过份额比例直接转走金库 GLC 的 `sweep`/`rescue`，SHALL NOT 存在没收持有人份额的 `adminBurn`，SHALL NOT 存在 `pause`，且 SHALL NOT 存在突破 `MAX_SHARES` 的增铸路径——admin 的唯一特权是在硬上限内增铸份额。
+
+#### Scenario: admin 在腾出额度内增铸
+
+- **GIVEN** 某持有人已 `redeem` 使 `totalSupply() < MAX_SHARES`，腾出额度 `R = MAX_SHARES - totalSupply()`
+- **AND** 调用方持有 `DEFAULT_ADMIN_ROLE`
+- **WHEN** 调用 `adminMint(s, receiver)` 且 `s <= R`
+- **THEN** MUST 成功 `_mint(receiver, s)`，`balanceOf(receiver)` 增加 `s`，不收取 `receiver` 任何 GLC
+- **AND** 铸后 `totalSupply()` MUST NOT 超过 `MAX_SHARES`
+
+#### Scenario: 满额时 adminMint revert
+
+- **GIVEN** `totalSupply() == MAX_SHARES`（如部署后初始状态）
+- **AND** 调用方持有 `DEFAULT_ADMIN_ROLE`
+- **WHEN** 调用 `adminMint(s, receiver)`，`s > 0`
+- **THEN** `maxMint(receiver)` MUST 返回 0
+- **AND** MUST revert（`ERC4626ExceededMaxMint`）
+
+#### Scenario: 超额增铸 revert
+
+- **GIVEN** 腾出额度 `R = MAX_SHARES - totalSupply()`，`R > 0`
+- **AND** 调用方持有 `DEFAULT_ADMIN_ROLE`
+- **WHEN** 调用 `adminMint(s, receiver)` 且 `s > R`
+- **THEN** MUST revert（`ERC4626ExceededMaxMint`），`totalSupply()` 不变
+
+#### Scenario: 非 admin 调用 revert
+
+- **GIVEN** 调用方不持有 `DEFAULT_ADMIN_ROLE`
+- **WHEN** 调用 `adminMint(s, receiver)`
+- **THEN** MUST revert（`AccessControlUnauthorizedAccount`）
+
+#### Scenario: 部署即授予 owner 管理员角色
+
+- **WHEN** `SalesVault` 部署，构造参数 `owner_`
+- **THEN** `hasRole(DEFAULT_ADMIN_ROLE, owner_)` MUST 为 `true`
+
+#### Scenario: 无其他资金后门
 
 - **WHEN** 检视金库对外函数
-- **THEN** MUST NOT 存在仅 owner/admin 可调的 `_mint` 包装（如 `topUp`）
-
-#### Scenario: 无资金后门
-
-- **WHEN** 检视金库对外函数
-- **THEN** MUST NOT 存在绕过份额比例、由 owner/admin 直接转走金库 GLC 的函数（如 `sweep` / `rescue`）
+- **THEN** MUST NOT 存在绕过份额比例、由 owner/admin 直接转走金库 GLC 的函数（如 `sweep` / `rescue`），亦 MUST NOT 存在 `adminBurn` / `pause`
