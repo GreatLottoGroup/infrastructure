@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
 
 /// @title Self Permit
 /// @notice Functionality to call permit on any EIP-2612-compliant token for use in the route

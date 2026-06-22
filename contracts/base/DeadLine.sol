@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.26;
 
 /// @title Prevents delegatecall to a contract
 /// @notice Base contract that provides a modifier for preventing delegatecall to methods in a child contract
