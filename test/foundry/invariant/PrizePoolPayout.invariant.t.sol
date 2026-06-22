@@ -5,8 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {PrizePoolBaseHarness} from "../harness/PrizePoolBaseHarness.sol";
 import {GreatLottoCoin} from "../../../contracts/GreatLottoCoin.sol";
-import {DaoCoin} from "../../../contracts/DaoCoin.sol";
-import {DaoBenefitPool} from "../../../contracts/DaoBenefitPool.sol";
+import {SalesVault} from "../../../contracts/SalesVault.sol";
 import {SalesChannel} from "../../../contracts/SalesChannel.sol";
 import {MockERC20Permit} from "../mocks/MockERC20.sol";
 
@@ -63,11 +62,10 @@ contract PrizePoolPayoutInvariant is StdInvariant, Test {
         toks[0] = address(usdc);
 
         glc = new GreatLottoCoin(toks, owner);
-        DaoCoin dao = new DaoCoin(owner);
-        DaoBenefitPool daoPool = new DaoBenefitPool(address(glc), address(dao));
+        SalesVault vault = new SalesVault(address(glc), owner);
         SalesChannel channels = new SalesChannel(owner);
         h = new PrizePoolBaseHarness(
-            address(glc), address(dao), address(daoPool), address(channels), owner, 30, 70
+            address(glc), address(vault), address(channels), owner, 30, 70
         );
         vm.prank(owner);
         glc.grantRole(keccak256("PARTNER_CONTRACT_ROLE"), address(h));

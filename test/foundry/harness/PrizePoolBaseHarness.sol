@@ -11,13 +11,12 @@ contract PrizePoolBaseHarness is PrizePoolBase {
 
     constructor(
         address coin,
-        address daoCoinAddr,
-        address daoBenefitPoolAddr,
+        address salesVaultAddr,
         address salesChannelAddr,
         address _owner,
         uint16 initialChannelRate,
         uint16 initialSellRate
-    ) PrizePoolBase(coin, daoCoinAddr, daoBenefitPoolAddr, salesChannelAddr, _owner, initialChannelRate, initialSellRate) {}
+    ) PrizePoolBase(coin, salesVaultAddr, salesChannelAddr, _owner, initialChannelRate, initialSellRate) {}
 
     function getCoin() external view returns (ICoinBase) {
         return _getCoin();
@@ -57,23 +56,19 @@ contract PrizePoolBaseHarness is PrizePoolBase {
         _channelBenefitTransfer(coin, benefit, chnId);
     }
 
-    function daoBenefitTransfer(ICoinBase coin, uint256 benefit) external {
-        _daoBenefitTransfer(coin, benefit);
+    function salesVaultTransfer(ICoinBase coin, uint256 benefit) external {
+        _salesVaultTransfer(coin, benefit);
     }
 
     function getBenefitByRate(uint originAmount, uint16 benefitRate) external pure returns (uint, uint) {
         return _getBenefitByRate(originAmount, benefitRate);
     }
 
-    function mintDaoCoinToPayer(address payer, uint256 assets) external {
-        _mintDaoCoinToPayer(payer, assets);
-    }
-
-    function distributeChannelAndDaoBenefits(
+    function distributeChannelAndSalesBenefits(
         ICoinBase coin,
         uint amountByCoin,
         uint256 channelId
     ) external returns (uint) {
-        return _distributeChannelAndDaoBenefits(coin, amountByCoin, channelId);
+        return _distributeChannelAndSalesBenefits(coin, amountByCoin, channelId);
     }
 }

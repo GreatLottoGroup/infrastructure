@@ -36,4 +36,4 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js \
 - [ ] 主网前把 `ignition/modules/infrastructure.js` 从 `GreatLottoCoinTest` 切回 `GreatLottoCoin`
 - [ ] `.env` 中的 `DEPLOY_ACCOUNT_PRIVATE_KEY` / `ALCHEMY_API_KEY` / `*SCAN_API_KEY` 已配置（RPC / 验证仍读 env）
 
-> **下游 localhost 地址依赖**：ScratchCard / GreatLottoCore 的 `localhost.json` 预填了「fresh 本地链上由 account#0 首个部署本模块」得到的确定性地址（DaoCoin / GreatLottoCoin / DaoBenefitPool / SalesChannel）。改动本模块的合约部署顺序会影响这些地址 —— 如调整顺序，记得同步更新下游两仓的 `localhost.json`。
+> **下游 localhost 地址依赖**：ScratchCard / GreatLottoCore 的 `localhost.json` 预填了「fresh 本地链上由 account#0 首个部署本模块」得到的确定性地址（GreatLottoCoin / SalesVault / SalesChannel）。改动本模块的合约部署顺序会影响这些地址 —— 如调整顺序，记得同步更新下游两仓的 `localhost.json`。

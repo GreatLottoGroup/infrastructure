@@ -4,7 +4,6 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "../interfaces/ICoinBase.sol";
-import "../interfaces/IDaoCoin.sol";
 import "../interfaces/ISalesChannel.sol";
 import "../interfaces/IPrizePoolBase.sol";
 
@@ -13,20 +12,18 @@ import "./NoDelegateCall.sol";
 
 /// @title PrizePoolBase
 /// @notice 抽象奖池基类：提供奖金池收款（GLC 直接转账 / 外币 mint / EIP-2612 permit）、分润计算、
-///         渠道与 DAO 利润池两段分润 pipeline、治理币增发等可组合的 internal helper，以及独立的
+///         渠道与销售金库两段分润 pipeline 等可组合的 internal helper，以及独立的
 ///         渠道 / sell 分润率治理 setter。下游通过 `is PrizePoolBase` 继承并按需组合 helper。
 /// @dev    helper 全部 internal；setter external，受 `DEFAULT_ADMIN_ROLE` 守护。
 ///         调用方负责保证 `channelBenefitRate + sellBenefitRate <= 1000`，超过会让
-///         `_distributeChannelAndDaoBenefits` underflow revert（已知 governance footgun，base 不强制 cap）。
+///         `_distributeChannelAndSalesBenefits` underflow revert（已知 governance footgun，base 不强制 cap）。
 abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall, IPrizePoolBase {
     using SafeERC20 for ICoinBase;
 
     // 资产币地址（GLC）
     address public immutable GreatLottoCoinAddress;
-    // Dao 治理币地址
-    address public immutable DaoCoinAddress;
-    // Dao 利润池
-    address public immutable DaoBenefitPoolAddress;
+    // 销售利润金库（ERC4626，销售分润经 transfer 入库自动按份额增值）
+    address public immutable SalesVaultAddress;
     // SalesChannel 注册表
     address public immutable SalesChannelAddress;
 
@@ -47,18 +44,16 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
 
     constructor(
         address coin,
-        address daoCoinAddr,
-        address daoBenefitPoolAddr,
+        address salesVaultAddr,
         address salesChannelAddr,
         address owner_,
         uint16 initialChannelRate,
         uint16 initialSellRate
-    ) 
-    AccessControlPartnerContract(owner_) 
+    )
+    AccessControlPartnerContract(owner_)
     {
         GreatLottoCoinAddress = coin;
-        DaoCoinAddress = daoCoinAddr;
-        DaoBenefitPoolAddress = daoBenefitPoolAddr;
+        SalesVaultAddress = salesVaultAddr;
         SalesChannelAddress = salesChannelAddr;
         channelBenefitRate = initialChannelRate;
         sellBenefitRate = initialSellRate;
@@ -188,9 +183,9 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         _transferTo(coin, chn, benefit);
     }
 
-    /// @notice 给 DAO 利润池打款（语义化 sugar）
-    function _daoBenefitTransfer(ICoinBase coin, uint256 benefit) internal {
-        _transferTo(coin, DaoBenefitPoolAddress, benefit);
+    /// @notice 给销售利润金库打款（语义化 sugar）；该转账抬高金库 totalAssets、不动 totalSupply。
+    function _salesVaultTransfer(ICoinBase coin, uint256 benefit) internal {
+        _transferTo(coin, SalesVaultAddress, benefit);
     }
 
     /// @notice 分润计算（千分比）
@@ -199,19 +194,14 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         afterAmount = originAmount - benefit;
     }
 
-    /// @notice 给买家增发治理币（语义化 sugar）
-    function _mintDaoCoinToPayer(address payer, uint256 assets) internal {
-        IDaoCoin(DaoCoinAddress).mintToUser(payer, assets);
-    }
-
-    /// @notice 渠道+DAO 两段分润 pipeline
+    /// @notice 渠道+销售金库 两段分润 pipeline
     /// @param  coin         GLC ICoinBase 引用（由调用方 `_getCoin` 或 `_colletWithCoin` 返回）
     /// @param  amountByCoin 用于计算分润的基数（GLC 计价）
-    /// @param  channelId    > 0 时按渠道分别打款（渠道 + sell→DAO）；== 0 时合并打入 DAO（channel + sell 都进 DAO）
+    /// @param  channelId    > 0 时按渠道分别打款（渠道 + sell→金库）；== 0 时合并打入金库（channel + sell 都进金库）
     /// @return netAmount    `amountByCoin - channelBenefit - sellBenefit`，由 caller 决定净值去向
     /// @dev    调用方需保证合约 GLC 余额足以覆盖应付分润总额；不足时 `_transferTo` 会 revert
     ///         `ErrorInsufficientBalance`。本 helper 不 emit 单独事件，链下从 ERC20 Transfer 事件推断。
-    function _distributeChannelAndDaoBenefits(
+    function _distributeChannelAndSalesBenefits(
         ICoinBase coin,
         uint amountByCoin,
         uint256 channelId
@@ -219,16 +209,16 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         (uint channelBenefit, ) = _getBenefitByRate(amountByCoin, channelBenefitRate);
         (uint sellBenefit, ) = _getBenefitByRate(amountByCoin, sellBenefitRate);
 
-        uint daoBenefit;
+        uint salesBenefit;
         if (channelId > 0) {
             _channelBenefitTransfer(coin, channelBenefit, channelId);
-            daoBenefit = sellBenefit;
+            salesBenefit = sellBenefit;
         } else {
-            daoBenefit = sellBenefit + channelBenefit;
+            salesBenefit = sellBenefit + channelBenefit;
         }
 
-        if (daoBenefit > 0) {
-            _daoBenefitTransfer(coin, daoBenefit);
+        if (salesBenefit > 0) {
+            _salesVaultTransfer(coin, salesBenefit);
         }
 
         netAmount = amountByCoin - channelBenefit - sellBenefit;

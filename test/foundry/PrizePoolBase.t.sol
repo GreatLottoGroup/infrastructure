@@ -4,8 +4,7 @@ pragma solidity ^0.8.24;
 import {PermitHelper} from "./base/PermitHelper.sol";
 import {PrizePoolBaseHarness} from "./harness/PrizePoolBaseHarness.sol";
 import {GreatLottoCoin} from "../../contracts/GreatLottoCoin.sol";
-import {DaoCoin} from "../../contracts/DaoCoin.sol";
-import {DaoBenefitPool} from "../../contracts/DaoBenefitPool.sol";
+import {SalesVault} from "../../contracts/SalesVault.sol";
 import {SalesChannel} from "../../contracts/SalesChannel.sol";
 import {ICoinBase} from "../../contracts/interfaces/ICoinBase.sol";
 import {IPrizePoolBase} from "../../contracts/interfaces/IPrizePoolBase.sol";
@@ -23,8 +22,7 @@ import {MockSilentFailCoin} from "./mocks/MockSilentFailCoin.sol";
 contract PrizePoolBaseTest is PermitHelper {
     PrizePoolBaseHarness internal h;
     GreatLottoCoin internal glc;
-    DaoCoin internal dao;
-    DaoBenefitPool internal daoPool;
+    SalesVault internal vault;
     SalesChannel internal channels;
     MockERC20Permit internal usdc;
 
@@ -41,17 +39,15 @@ contract PrizePoolBaseTest is PermitHelper {
         toks[0] = address(usdc);
 
         glc = new GreatLottoCoin(toks, owner);
-        dao = new DaoCoin(owner);
-        daoPool = new DaoBenefitPool(address(glc), address(dao));
+        vault = new SalesVault(address(glc), owner);
         channels = new SalesChannel(owner);
         h = new PrizePoolBaseHarness(
-            address(glc), address(dao), address(daoPool), address(channels), owner, CH_RATE, SELL_RATE
+            address(glc), address(vault), address(channels), owner, CH_RATE, SELL_RATE
         );
 
-        // harness 需要 PARTNER 角色以 mint GLC / DaoCoin
+        // harness 需要 PARTNER 角色以 mint GLC
         vm.startPrank(owner);
         glc.grantRole(PARTNER_ROLE, address(h));
-        dao.grantRole(PARTNER_ROLE, address(h));
         vm.stopPrank();
 
         // 注册一个渠道（chnId = 1 → channelAddr）
@@ -65,8 +61,7 @@ contract PrizePoolBaseTest is PermitHelper {
 
     function test_constructor_immutablesAndRates() public view {
         assertEq(h.GreatLottoCoinAddress(), address(glc));
-        assertEq(h.DaoCoinAddress(), address(dao));
-        assertEq(h.DaoBenefitPoolAddress(), address(daoPool));
+        assertEq(h.SalesVaultAddress(), address(vault));
         assertEq(h.SalesChannelAddress(), address(channels));
         assertEq(h.channelBenefitRate(), CH_RATE);
         assertEq(h.sellBenefitRate(), SELL_RATE);
@@ -191,20 +186,22 @@ contract PrizePoolBaseTest is PermitHelper {
         assertEq(benefit + after_, origin);
     }
 
-    function test_distribute_withChannel_splitsChannelAndDao() public {
+    function test_distribute_withChannel_splitsChannelAndVault() public {
+        uint256 vaultBefore = glc.balanceOf(address(vault));
         deal(address(glc), address(h), 1000e18);
-        uint256 net = h.distributeChannelAndDaoBenefits(ICoinBase(address(glc)), 1000e18, 1);
-        // channel 3% = 30e18, sell 7% = 70e18 → DAO
+        uint256 net = h.distributeChannelAndSalesBenefits(ICoinBase(address(glc)), 1000e18, 1);
+        // channel 3% = 30e18, sell 7% = 70e18 → 销售金库
         assertEq(glc.balanceOf(channelAddr), 30e18);
-        assertEq(glc.balanceOf(address(daoPool)), 70e18);
+        assertEq(glc.balanceOf(address(vault)), vaultBefore + 70e18);
         assertEq(net, 900e18);
     }
 
-    function test_distribute_withoutChannel_allBenefitToDao() public {
+    function test_distribute_withoutChannel_allBenefitToVault() public {
+        uint256 vaultBefore = glc.balanceOf(address(vault));
         deal(address(glc), address(h), 1000e18);
-        uint256 net = h.distributeChannelAndDaoBenefits(ICoinBase(address(glc)), 1000e18, 0);
-        // channel(30e18) + sell(70e18) 全进 DAO
-        assertEq(glc.balanceOf(address(daoPool)), 100e18);
+        uint256 net = h.distributeChannelAndSalesBenefits(ICoinBase(address(glc)), 1000e18, 0);
+        // channel(30e18) + sell(70e18) 全进销售金库
+        assertEq(glc.balanceOf(address(vault)), vaultBefore + 100e18);
         assertEq(glc.balanceOf(channelAddr), 0);
         assertEq(net, 900e18);
     }
@@ -265,12 +262,6 @@ contract PrizePoolBaseTest is PermitHelper {
     function test_payoutTransfer_revert_whenNotSelfCall() public {
         vm.expectRevert(IPrizePoolBase.ErrorUnauthorizedSelfCall.selector);
         h._payoutTransfer(alice, 1e18);
-    }
-
-    function test_mintDaoCoinToPayer() public {
-        h.mintDaoCoinToPayer(alice, 1000e18);
-        // price 1e18 → shares == assets
-        assertEq(dao.balanceOf(alice), 1000e18);
     }
 
     // ---------------------------------------------------------------------
