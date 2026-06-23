@@ -15,8 +15,8 @@ import "./NoDelegateCall.sol";
 ///         渠道与销售金库两段分润 pipeline 等可组合的 internal helper，以及独立的
 ///         渠道 / sell 分润率治理 setter。下游通过 `is PrizePoolBase` 继承并按需组合 helper。
 /// @dev    helper 全部 internal；setter external，受 `DEFAULT_ADMIN_ROLE` 守护。
-///         调用方负责保证 `channelBenefitRate + sellBenefitRate <= 1000`，超过会让
-///         `_distributeChannelAndSalesBenefits` underflow revert（已知 governance footgun，base 不强制 cap）。
+///         渠道分润率构造期固定、无 setter（构造初值受 MAX_CHANNEL_BENEFIT_RATE 5%=50‰ 上限）；
+///         销售分润率经 setSellBenefitRate 调整、构造初值与 setter 均受 MAX_SELL_BENEFIT_RATE（5%=50‰）上限约束。
 abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall, IPrizePoolBase {
     using SafeERC20 for ICoinBase;
 
@@ -27,10 +27,17 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
     // SalesChannel 注册表
     address public immutable SalesChannelAddress;
 
-    // 渠道分润率（千分比）；public getter 实现 IPrizePoolBase.channelBenefitRate()
+    // 渠道分润率硬上限（千分比）：5% = 50‰。构造期 initialChannelRate 不得超过此值。
+    uint16 public constant MAX_CHANNEL_BENEFIT_RATE = 50;
+
+    // 销售分润率硬上限（千分比）：5% = 50‰。构造期 initialSellRate 与 setSellBenefitRate 均不得超过此值。
+    uint16 public constant MAX_SELL_BENEFIT_RATE = 50;
+
+    // 渠道分润率（千分比）；构造期固定、无运行时 setter（治理面收敛、增强渠道方信任）。
+    // public getter 实现 IPrizePoolBase.channelBenefitRate()。
     uint16 public override channelBenefitRate;
 
-    // 销售分润率（千分比）；public getter 实现 IPrizePoolBase.sellBenefitRate()
+    // 销售分润率（千分比）；public getter 实现 IPrizePoolBase.sellBenefitRate()。可经 setSellBenefitRate 调整，受 MAX_SELL_BENEFIT_RATE 上限约束。
     uint16 public override sellBenefitRate;
 
     // 付奖兜底：push 付款（如 callback 内付奖、债务清偿）失败时按 user 记账，转 pull 模式，
@@ -52,6 +59,16 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
     )
     AccessControlPartnerContract(owner_)
     {
+        // 构造初值各自受硬上限约束：渠道率部署后不可改（无 setter），故必须在构造期就卡死；
+        // 销售率复用 setSellBenefitRate 的同一上限 MAX_SELL_BENEFIT_RATE，保证构造初值与运行时
+        // setter 口径一致。两档各 <= 50‰ ⇒ 之和 <= 100‰ << 1000，_distributeChannelAndSalesBenefits
+        // 绝不 underflow。下游若另有分润档（如 investor），其与本两档之和 <= 1000 由下游自行保证。
+        if (initialChannelRate > MAX_CHANNEL_BENEFIT_RATE) {
+            revert ErrorChannelRateTooHigh(initialChannelRate, MAX_CHANNEL_BENEFIT_RATE);
+        }
+        if (initialSellRate > MAX_SELL_BENEFIT_RATE) {
+            revert ErrorSellRateTooHigh(initialSellRate, MAX_SELL_BENEFIT_RATE);
+        }
         GreatLottoCoinAddress = coin;
         SalesVaultAddress = salesVaultAddr;
         SalesChannelAddress = salesChannelAddr;
@@ -230,23 +247,14 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         netAmount = amountByCoin - channelBenefit - sellBenefit;
     }
 
-    /// @notice 治理：修改渠道分润率
-    /// @dev    每档独立 setter；下游若需新增档（如 invest），自加同形 setter + 事件，不需 override。
-    ///         调用方负责保证 `channelBenefitRate + sellBenefitRate <= 1000`（base 不强制 cap）。
-    function setChannelBenefitRate(uint16 rate) external virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
-        if (rate == 0) {
-            revert ErrorInvalidAmount(0);
-        }
-        channelBenefitRate = rate;
-        emit ChannelBenefitRateChanged(rate);
-        return true;
-    }
-
     /// @notice 治理：修改销售分润率
-    /// @dev    每档独立 setter；调用方负责保证两档之和不超过 1000。
+    /// @dev    渠道分润率构造期固定、无 setter；销售分润率可调但受 MAX_SELL_BENEFIT_RATE（5%=50‰）硬上限约束，
     function setSellBenefitRate(uint16 rate) external virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
         if (rate == 0) {
             revert ErrorInvalidAmount(0);
+        }
+        if (rate > MAX_SELL_BENEFIT_RATE) {
+            revert ErrorSellRateTooHigh(rate, MAX_SELL_BENEFIT_RATE);
         }
         sellBenefitRate = rate;
         emit SellBenefitRateChanged(rate);

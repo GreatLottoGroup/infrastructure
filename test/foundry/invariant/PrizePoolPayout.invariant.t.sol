@@ -65,7 +65,7 @@ contract PrizePoolPayoutInvariant is StdInvariant, Test {
         SalesVault vault = new SalesVault(address(glc), owner);
         SalesChannel channels = new SalesChannel(address(glc), owner);
         h = new PrizePoolBaseHarness(
-            address(glc), address(vault), address(channels), owner, 30, 70
+            address(glc), address(vault), address(channels), owner, 30, 50
         );
         vm.prank(owner);
         glc.grantRole(keccak256("PARTNER_CONTRACT_ROLE"), address(h));

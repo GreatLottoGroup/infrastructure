@@ -28,8 +28,8 @@ contract PrizePoolBaseTest is PermitHelper {
 
     bytes32 internal constant PARTNER_ROLE = keccak256("PARTNER_CONTRACT_ROLE");
     bytes32 internal constant ADMIN_ROLE = 0x00;
-    uint16 internal constant CH_RATE = 30; // 3%
-    uint16 internal constant SELL_RATE = 70; // 7%
+    uint16 internal constant CH_RATE = 30; // 3%（<= MAX_CHANNEL_BENEFIT_RATE 50）
+    uint16 internal constant SELL_RATE = 50; // 5%（= MAX_SELL_BENEFIT_RATE 上限）
 
     address internal channelAddr = makeAddr("channelAddr");
 
@@ -67,6 +67,26 @@ contract PrizePoolBaseTest is PermitHelper {
         assertEq(h.channelBenefitRate(), CH_RATE);
         assertEq(h.sellBenefitRate(), SELL_RATE);
         assertEq(address(h.getCoin()), address(glc));
+    }
+
+    function test_constructor_revert_whenChannelRateAboveCap() public {
+        // 构造初值 channel 超 50‰ 上限 → revert（渠道率部署后不可改，必须构造期卡死）
+        vm.expectRevert(abi.encodeWithSelector(IPrizePoolBase.ErrorChannelRateTooHigh.selector, uint16(51), uint16(50)));
+        new PrizePoolBaseHarness(address(glc), address(vault), address(channels), owner, 51, 50);
+    }
+
+    function test_constructor_revert_whenSellRateAboveCap() public {
+        // 构造初值 sell 超 50‰ 上限 → revert（与 setSellBenefitRate 同一上限）
+        vm.expectRevert(abi.encodeWithSelector(IPrizePoolBase.ErrorSellRateTooHigh.selector, uint16(51), uint16(50)));
+        new PrizePoolBaseHarness(address(glc), address(vault), address(channels), owner, 50, 51);
+    }
+
+    function test_constructor_success_whenBothAtCap() public {
+        // 边界：两档恰各 50‰ 允许
+        PrizePoolBaseHarness edge =
+            new PrizePoolBaseHarness(address(glc), address(vault), address(channels), owner, 50, 50);
+        assertEq(edge.channelBenefitRate(), 50);
+        assertEq(edge.sellBenefitRate(), 50);
     }
 
     // ---------------------------------------------------------------------
@@ -197,26 +217,26 @@ contract PrizePoolBaseTest is PermitHelper {
         uint256 vaultBefore = glc.balanceOf(address(vault));
         deal(address(glc), address(h), 1000e18);
         uint256 net = h.distributeChannelAndSalesBenefits(ICoinBase(address(glc)), 1000e18, 1);
-        // channel 3% = 30e18 → 转入 SalesChannel 合约并记账（非渠道 EOA）；sell 7% = 70e18 → 销售金库
+        // channel 3% = 30e18 → 转入 SalesChannel 合约并记账（非渠道 EOA）；sell 5% = 50e18 → 销售金库
         assertEq(glc.balanceOf(address(channels)), 30e18);
         assertEq(channels.pendingOf(1), 30e18);
         assertEq(channels.accruedOf(1), 30e18);
         assertEq(channels.totalAccrued(), 30e18);
         assertEq(glc.balanceOf(channelAddr), 0); // 渠道 EOA 不再直接收款
-        assertEq(glc.balanceOf(address(vault)), vaultBefore + 70e18);
-        assertEq(net, 900e18);
+        assertEq(glc.balanceOf(address(vault)), vaultBefore + 50e18);
+        assertEq(net, 920e18);
     }
 
     function test_distribute_withoutChannel_allBenefitToVault() public {
         uint256 vaultBefore = glc.balanceOf(address(vault));
         deal(address(glc), address(h), 1000e18);
         uint256 net = h.distributeChannelAndSalesBenefits(ICoinBase(address(glc)), 1000e18, 0);
-        // channel(30e18) + sell(70e18) 全进销售金库；SalesChannel 不收款不记账
-        assertEq(glc.balanceOf(address(vault)), vaultBefore + 100e18);
+        // channel(30e18) + sell(50e18) 全进销售金库；SalesChannel 不收款不记账
+        assertEq(glc.balanceOf(address(vault)), vaultBefore + 80e18);
         assertEq(glc.balanceOf(address(channels)), 0);
         assertEq(channels.totalAccrued(), 0);
         assertEq(glc.balanceOf(channelAddr), 0);
-        assertEq(net, 900e18);
+        assertEq(net, 920e18);
     }
 
     function test_channelBenefitTransfer_transfersToSalesChannelAndCredits() public {
@@ -298,26 +318,19 @@ contract PrizePoolBaseTest is PermitHelper {
     // 治理：分润率 setter
     // ---------------------------------------------------------------------
 
-    function test_setChannelBenefitRate_success_emits() public {
-        vm.expectEmit(false, false, false, true, address(h));
-        emit IPrizePoolBase.ChannelBenefitRateChanged(50);
-        vm.prank(owner);
-        h.setChannelBenefitRate(50);
-        assertEq(h.channelBenefitRate(), 50);
-    }
-
     function test_setSellBenefitRate_success_emits() public {
         vm.expectEmit(false, false, false, true, address(h));
-        emit IPrizePoolBase.SellBenefitRateChanged(120);
+        emit IPrizePoolBase.SellBenefitRateChanged(40);
         vm.prank(owner);
-        h.setSellBenefitRate(120);
-        assertEq(h.sellBenefitRate(), 120);
+        h.setSellBenefitRate(40);
+        assertEq(h.sellBenefitRate(), 40);
     }
 
-    function test_setChannelBenefitRate_revert_whenZero() public {
+    function test_setSellBenefitRate_success_atMaxCap() public {
+        uint16 cap = h.MAX_SELL_BENEFIT_RATE();
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(IErrorsBase.ErrorInvalidAmount.selector, 0));
-        h.setChannelBenefitRate(0);
+        h.setSellBenefitRate(cap);
+        assertEq(h.sellBenefitRate(), 50);
     }
 
     function test_setSellBenefitRate_revert_whenZero() public {
@@ -326,11 +339,17 @@ contract PrizePoolBaseTest is PermitHelper {
         h.setSellBenefitRate(0);
     }
 
-    function test_setChannelBenefitRate_revert_whenNotAdmin() public {
+    function test_setSellBenefitRate_revert_whenAboveCap() public {
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(IPrizePoolBase.ErrorSellRateTooHigh.selector, 51, 50));
+        h.setSellBenefitRate(51);
+    }
+
+    function test_setSellBenefitRate_revert_whenNotAdmin() public {
         vm.prank(alice);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, alice, ADMIN_ROLE)
         );
-        h.setChannelBenefitRate(50);
+        h.setSellBenefitRate(40);
     }
 }
