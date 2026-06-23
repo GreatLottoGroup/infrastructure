@@ -4,6 +4,7 @@ pragma solidity ^0.8.26;
 import {BaseTest} from "./base/BaseTest.sol";
 import {MockEntropyWithFee} from "./mocks/MockEntropyWithFee.sol";
 import {MockEntropyConsumer} from "./harness/MockEntropyConsumer.sol";
+import {DefaultHooksEntropyConsumer} from "./harness/DefaultHooksEntropyConsumer.sol";
 import {IEntropyConsumerBase} from "../../contracts/interfaces/IEntropyConsumerBase.sol";
 import {IErrorsBase} from "../../contracts/interfaces/IErrorsBase.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -286,6 +287,33 @@ contract EntropyConsumerBaseTest is BaseTest {
         vm.prank(owner);
         vm.expectRevert(IEntropyConsumerBase.ErrorInvalidEntropyTimeout.selector);
         consumer.setEntropyTimeout(uint64(24 hours) + 1);
+    }
+
+    // ---------------------------------------------------------------------
+    // 基类默认 hook 体（子类不 override _postRequest/_beforeRetry/_postRetry）
+    // ---------------------------------------------------------------------
+
+    /// @dev 用一个仅实现强制 hook、其余 hook 走基类空默认实现的子类，驱动 request→callback→retry
+    ///      全链路，覆盖 MockEntropyConsumer（全 override）触及不到的基类默认 hook 体。
+    function test_defaultHooks_requestCallbackRetry_coversBaseHookBodies() public {
+        DefaultHooksEntropyConsumer dh = new DefaultHooksEntropyConsumer(address(entropy), provider, owner);
+        vm.deal(address(dh), 0);
+
+        // request → 触发基类默认 _postRequest（空体）
+        (uint64 seq,) = dh.requestRandomness{value: FEE}(1, alice, 1, RAND);
+        assertTrue(dh.getRequest(seq).exists);
+
+        // 超时后 retry → 触发基类默认 _beforeRetry + _postRetry（空体）
+        vm.warp(block.timestamp + dh.entropyTimeout());
+        vm.deal(alice, 1 ether);
+        vm.prank(alice);
+        uint64 newSeq = dh.retryRequest{value: FEE}(seq, RAND2, futureDeadline());
+        assertTrue(dh.getRequest(newSeq).exists);
+        assertFalse(dh.getRequest(seq).exists);
+
+        // callback → fulfill
+        entropy.mockReveal(address(dh), newSeq, RAND2);
+        assertEq(dh.lastSequence(), newSeq);
     }
 
     // ---------------------------------------------------------------------

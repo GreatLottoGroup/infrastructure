@@ -89,6 +89,12 @@ contract PrizePoolBaseTest is PermitHelper {
         h.colletWithCoin(address(glc), alice, 0);
     }
 
+    function test_colletWithCoin_permit_revert_whenAmountZero() public {
+        // permit 重载的零额守卫（与直接版独立的一条分支）
+        vm.expectRevert(abi.encodeWithSelector(IErrorsBase.ErrorInvalidAmount.selector, 0));
+        h.colletWithCoin(address(glc), alice, 0, futureDeadline(), 0, bytes32(0), bytes32(0));
+    }
+
     function test_colletWithCoin_externalTokenPath_mintsGlc() public {
         // token != GLC → 走 coin.mint(token, amount, payer)：拉 payer 的底层 usdc、铸 GLC 给 harness
         usdc.mint(alice, 100e6);
