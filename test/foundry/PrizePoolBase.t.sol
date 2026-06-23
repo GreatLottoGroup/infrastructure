@@ -40,14 +40,15 @@ contract PrizePoolBaseTest is PermitHelper {
 
         glc = new GreatLottoCoin(toks, owner);
         vault = new SalesVault(address(glc), owner);
-        channels = new SalesChannel(owner);
+        channels = new SalesChannel(address(glc), owner);
         h = new PrizePoolBaseHarness(
             address(glc), address(vault), address(channels), owner, CH_RATE, SELL_RATE
         );
 
-        // harness 需要 PARTNER 角色以 mint GLC
+        // harness 需要 PARTNER 角色以 mint GLC；并需在 SalesChannel 上有 PARTNER 角色以 creditChannel
         vm.startPrank(owner);
         glc.grantRole(PARTNER_ROLE, address(h));
+        channels.grantRole(PARTNER_ROLE, address(h));
         vm.stopPrank();
 
         // 注册一个渠道（chnId = 1 → channelAddr）
@@ -190,8 +191,12 @@ contract PrizePoolBaseTest is PermitHelper {
         uint256 vaultBefore = glc.balanceOf(address(vault));
         deal(address(glc), address(h), 1000e18);
         uint256 net = h.distributeChannelAndSalesBenefits(ICoinBase(address(glc)), 1000e18, 1);
-        // channel 3% = 30e18, sell 7% = 70e18 → 销售金库
-        assertEq(glc.balanceOf(channelAddr), 30e18);
+        // channel 3% = 30e18 → 转入 SalesChannel 合约并记账（非渠道 EOA）；sell 7% = 70e18 → 销售金库
+        assertEq(glc.balanceOf(address(channels)), 30e18);
+        assertEq(channels.pendingOf(1), 30e18);
+        assertEq(channels.accruedOf(1), 30e18);
+        assertEq(channels.totalAccrued(), 30e18);
+        assertEq(glc.balanceOf(channelAddr), 0); // 渠道 EOA 不再直接收款
         assertEq(glc.balanceOf(address(vault)), vaultBefore + 70e18);
         assertEq(net, 900e18);
     }
@@ -200,10 +205,29 @@ contract PrizePoolBaseTest is PermitHelper {
         uint256 vaultBefore = glc.balanceOf(address(vault));
         deal(address(glc), address(h), 1000e18);
         uint256 net = h.distributeChannelAndSalesBenefits(ICoinBase(address(glc)), 1000e18, 0);
-        // channel(30e18) + sell(70e18) 全进销售金库
+        // channel(30e18) + sell(70e18) 全进销售金库；SalesChannel 不收款不记账
         assertEq(glc.balanceOf(address(vault)), vaultBefore + 100e18);
+        assertEq(glc.balanceOf(address(channels)), 0);
+        assertEq(channels.totalAccrued(), 0);
         assertEq(glc.balanceOf(channelAddr), 0);
         assertEq(net, 900e18);
+    }
+
+    function test_channelBenefitTransfer_transfersToSalesChannelAndCredits() public {
+        deal(address(glc), address(h), 1000e18);
+        h.channelBenefitTransfer(ICoinBase(address(glc)), 10e18, 1);
+        assertEq(glc.balanceOf(address(channels)), 10e18);
+        assertEq(channels.pendingOf(1), 10e18);
+        assertEq(glc.balanceOf(channelAddr), 0);
+    }
+
+    function test_channelBenefitTransfer_zeroBenefit_earlyReturns() public {
+        deal(address(glc), address(h), 1000e18);
+        h.channelBenefitTransfer(ICoinBase(address(glc)), 0, 1);
+        // 不转账、不记账、不 revert
+        assertEq(glc.balanceOf(address(channels)), 0);
+        assertEq(channels.pendingOf(1), 0);
+        assertEq(channels.totalAccrued(), 0);
     }
 
     function test_channelBenefitTransfer_revert_whenChannelInvalid() public {

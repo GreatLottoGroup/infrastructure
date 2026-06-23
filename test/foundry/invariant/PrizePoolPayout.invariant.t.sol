@@ -63,7 +63,7 @@ contract PrizePoolPayoutInvariant is StdInvariant, Test {
 
         glc = new GreatLottoCoin(toks, owner);
         SalesVault vault = new SalesVault(address(glc), owner);
-        SalesChannel channels = new SalesChannel(owner);
+        SalesChannel channels = new SalesChannel(address(glc), owner);
         h = new PrizePoolBaseHarness(
             address(glc), address(vault), address(channels), owner, 30, 70
         );

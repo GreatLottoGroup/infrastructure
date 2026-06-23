@@ -18,8 +18,8 @@ module.exports = buildModule("Infrastructure", (m) => {
     // SalesVault 初始化（ERC4626 销售利润金库；构造铸满 1 亿份给 owner）
     const salesVault = m.contract("SalesVault", [greatLottoCoin, owner]);
 
-    // SalesChannel 初始化
-    const salesChannel = m.contract("SalesChannel", [owner]);
+    // SalesChannel 初始化（持 GLC + 渠道分润记账；构造需资产币地址 + owner）
+    const salesChannel = m.contract("SalesChannel", [greatLottoCoin, owner]);
 
 
     return { greatLottoCoin, salesVault, salesChannel };

@@ -174,13 +174,19 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         return _pendingPayoutTotal;
     }
 
-    /// @notice 给指定渠道分润；id 不存在（status==false && chn==address(0)）时 revert，其它情况打款。
+    /// @notice 给指定渠道分润；id 不存在（chn==address(0)）时 revert。
+    /// @dev    收款方为 SalesChannel 合约（非渠道 EOA）：先把等额 benefit 转入 SalesChannel，再调
+    ///         creditChannel 按 chnId 记账，由渠道方经 SalesChannel.withdraw 自提（pull payment）。
+    ///         转账与记账金额相等、顺序为「先转账后记账」——SalesChannel 偿付能力不变量的前提。
+    ///         benefit==0 时早退（不转账不记账）。
     function _channelBenefitTransfer(ICoinBase coin, uint256 benefit, uint256 chnId) internal {
-        (bool status, address chn, ) = ISalesChannel(SalesChannelAddress).getChannelById(chnId);
-        if (status == false && chn == address(0)) {
+        (address chn, ) = ISalesChannel(SalesChannelAddress).getChannelById(chnId);
+        if (chn == address(0)) {
             revert ISalesChannel.SalesChannelInvalid(chn);
         }
-        _transferTo(coin, chn, benefit);
+        if (benefit == 0) return;
+        _transferTo(coin, SalesChannelAddress, benefit);
+        ISalesChannel(SalesChannelAddress).creditChannel(chnId, benefit);
     }
 
     /// @notice 给销售利润金库打款（语义化 sugar）；该转账抬高金库 totalAssets、不动 totalSupply。
