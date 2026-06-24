@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "../interfaces/ICoinBase.sol";
 import "../interfaces/ISalesChannel.sol";
@@ -17,7 +18,7 @@ import "./NoDelegateCall.sol";
 /// @dev    helper 全部 internal；setter external，受 `DEFAULT_ADMIN_ROLE` 守护。
 ///         渠道分润率构造期固定、无 setter（构造初值受 MAX_CHANNEL_BENEFIT_RATE 5%=50‰ 上限）；
 ///         销售分润率经 setSellBenefitRate 调整、构造初值与 setter 均受 MAX_SELL_BENEFIT_RATE（5%=50‰）上限约束。
-abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall, IPrizePoolBase {
+abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall, ReentrancyGuard, IPrizePoolBase {
     using SafeERC20 for ICoinBase;
 
     // 资产币地址（GLC）
@@ -170,8 +171,9 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
     }
 
     /// @notice 用户提取此前 push 失败而记账的兜底欠款（单一资产币 GLC）。
-    /// @dev    pull 支付；noDelegateCall 防止经 delegatecall 篡改记账上下文。
-    function claimPayout() external noDelegateCall {
+    /// @dev    pull 支付；CEI 已先清零账本再转账，noDelegateCall 防止经 delegatecall 篡改记账上下文；
+    ///         nonReentrant 为防御纵深，令安全不再独依赖 GLC 无 transfer hook 这一治理前提。
+    function claimPayout() external noDelegateCall nonReentrant {
         uint256 amount = _pendingPayouts[msg.sender];
         if (amount == 0) revert ErrorNoPendingPayout();
         _pendingPayouts[msg.sender] = 0;

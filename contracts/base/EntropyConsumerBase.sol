@@ -6,10 +6,11 @@ import {IEntropyV2} from "@pythnetwork/entropy-sdk-solidity/IEntropyV2.sol";
 import {EntropyStructsV2} from "@pythnetwork/entropy-sdk-solidity/EntropyStructsV2.sol";
 import {EntropyStatusConstants} from "@pythnetwork/entropy-sdk-solidity/EntropyStatusConstants.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {DeadLine} from "./DeadLine.sol";
 import {IEntropyConsumerBase} from "../interfaces/IEntropyConsumerBase.sol";
 
-abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLine, IEntropyConsumerBase {
+abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLine, ReentrancyGuard, IEntropyConsumerBase {
     uint64 public constant MIN_ENTROPY_TIMEOUT = 60;
     uint64 public constant MAX_ENTROPY_TIMEOUT = 24 hours;
     uint32 public constant MIN_CALLBACK_GAS = 100_000;
@@ -97,7 +98,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         uint64 oldSequenceNumber,
         bytes32 newUserRandomNumber,
         uint256 deadline
-    ) external payable checkDeadline(deadline) returns (uint64 newSequenceNumber) {
+    ) external payable nonReentrant checkDeadline(deadline) returns (uint64 newSequenceNumber) {
         Request memory old = _request[oldSequenceNumber];
         if (!old.exists) revert ErrorRequestNotFound();
         if (old.requester != msg.sender) revert ErrorNotRequester();

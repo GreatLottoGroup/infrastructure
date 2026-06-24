@@ -6,6 +6,7 @@ import '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/access/AccessControl.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 import "./interfaces/IGreatLottoCoin.sol";
 
@@ -14,7 +15,7 @@ import "./base/NoDelegateCall.sol";
 import "./base/AccessControlPartnerContract.sol";
 
 // 奖池币
-contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract, NoDelegateCall, IGreatLottoCoin{
+contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract, NoDelegateCall, ReentrancyGuard, IGreatLottoCoin{
 
     using SafeERC20 for IERC20;
 
@@ -71,7 +72,7 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
     /**
      * @dev Allow a user to burn a number of wrapped tokens and withdraw the corresponding number of underlying tokens.
      */
-    function withdraw(address token, uint256 amount) external noDelegateCall returns (bool) {
+    function withdraw(address token, uint256 amount) external noDelegateCall nonReentrant returns (bool) {
 
         address recipient = _msgSender();
 

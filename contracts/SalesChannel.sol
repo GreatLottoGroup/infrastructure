@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "./interfaces/ISalesChannel.sol";
 import "./interfaces/ICoinBase.sol";
@@ -16,7 +17,7 @@ import "./base/DeadLine.sol";
 /// @dev    持有 GLC（ICoinBase），偿付能力恒满足 `balanceOf >= _totalAccrued - _totalWithdrawn`。
 ///         记账入口 `creditChannel` 受 PARTNER_CONTRACT_ROLE 守护，只授审计过、保证「先转账后记账等额」
 ///         的 PrizePool 合约。
-contract SalesChannel is ISalesChannel, AccessControlPartnerContract, NoDelegateCall, DeadLine {
+contract SalesChannel is ISalesChannel, AccessControlPartnerContract, NoDelegateCall, DeadLine, ReentrancyGuard {
     using SafeERC20 for ICoinBase;
 
     // 分页查询单页上限
@@ -160,7 +161,7 @@ contract SalesChannel is ISalesChannel, AccessControlPartnerContract, NoDelegate
 
     /// @notice 渠道方提取累计分润（pull payment）。提到 msg.sender 自己，不接受任意 to。
     /// @dev    CEI：先更新账本（_withdrawn / _totalWithdrawn）再 safeTransfer。
-    function withdraw() external noDelegateCall {
+    function withdraw() external noDelegateCall nonReentrant {
         uint256 chnId = _channelAddress[msg.sender];
         uint256 amount = _accrued[chnId] - _withdrawn[chnId];
         if (amount == 0) {
