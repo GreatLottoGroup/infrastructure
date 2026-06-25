@@ -9,11 +9,11 @@
     { "file": "PrizePool.json",            "source": "core", "artifact": "contracts/PrizePool.sol/PrizePool" },
     { "file": "GreatLotto.json",           "source": "core", "artifact": "contracts/GreatLotto.sol/GreatLotto" },
     { "file": "GreatLottoNFT.json",        "source": "core", "artifact": "contracts/GreatLottoNFT.sol/GreatLottoNFT" },
-    { "file": "InvestmentCoinBase.json",   "source": "core", "artifact": "contracts/base/InvestmentCoinBase.sol/InvestmentCoinBase" },
+    { "file": "InvestmentPosition.json",    "source": "core", "artifact": "contracts/InvestmentPosition.sol/InvestmentPosition" },
+    { "file": "InvestmentPositionSVG.json", "source": "core", "artifact": "contracts/InvestmentPositionSVG.sol/InvestmentPositionSVG" },
 
-    { "file": "DAOCoin.json",              "source": "infrastructure", "artifact": "contracts/DaoCoin.sol/DaoCoin" },
+    { "file": "SalesVault.json",           "source": "infrastructure", "artifact": "contracts/SalesVault.sol/SalesVault" },
     { "file": "SalesChannel.json",         "source": "infrastructure", "artifact": "contracts/SalesChannel.sol/SalesChannel" },
-    { "file": "BenefitPoolBase.json",      "source": "infrastructure", "artifact": "contracts/base/BenefitPoolBase.sol/BenefitPoolBase" },
 
     { "file": "GreatLottoCoin.json",       "source": "infrastructure",
       "variants": { "local":  "contracts/test/GreatLottoCoinTest.sol/GreatLottoCoinTest",
