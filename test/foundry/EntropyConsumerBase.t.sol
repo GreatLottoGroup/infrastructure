@@ -50,7 +50,7 @@ contract EntropyConsumerBaseTest is BaseTest {
     function test_deployment_defaults() public view {
         assertEq(address(consumer.entropy()), address(entropy));
         assertEq(consumer.entropyProvider(), provider);
-        assertEq(consumer.callbackGasLimit(), 500_000);
+        assertEq(consumer.callbackGasLimit(), 2_500_000);
         assertEq(consumer.entropyTimeout(), 3600);
         assertEq(consumer.entropyFee(), FEE);
         assertTrue(consumer.hasRole(ADMIN_ROLE, owner));
@@ -193,9 +193,10 @@ contract EntropyConsumerBaseTest is BaseTest {
         vm.expectEmit(true, true, true, true, address(consumer));
         emit IEntropyConsumerBase.RequestRetried(seq, 2, alice, FEE, FEE);
         vm.prank(alice);
-        uint64 newSeq = consumer.retryRequest{value: FEE + 30}(seq, RAND2, futureDeadline());
+        (uint64 newSeq, uint128 paidFee) = consumer.retryRequest{value: FEE + 30}(seq, RAND2, futureDeadline());
 
         assertEq(newSeq, 2);
+        assertEq(paidFee, FEE); // 返回的就是本次实付 entropy fee
         assertFalse(consumer.getRequest(seq).exists);
         IEntropyConsumerBase.Request memory r = consumer.getRequest(newSeq);
         assertTrue(r.exists);
@@ -212,8 +213,9 @@ contract EntropyConsumerBaseTest is BaseTest {
 
         vm.deal(alice, 1 ether);
         vm.prank(alice);
-        uint64 newSeq = consumer.retryRequest{value: FEE}(seq, RAND2, futureDeadline());
+        (uint64 newSeq, uint128 paidFee) = consumer.retryRequest{value: FEE}(seq, RAND2, futureDeadline());
         assertEq(newSeq, 2);
+        assertEq(paidFee, FEE);
         assertTrue(consumer.getRequest(newSeq).exists);
     }
 
@@ -259,6 +261,13 @@ contract EntropyConsumerBaseTest is BaseTest {
         assertEq(consumer.callbackGasLimit(), 750_000);
     }
 
+    function test_setCallbackGasLimit_success_atNewMax() public {
+        // 上限已抬至 MAX_CALLBACK_GAS = 5_000_000，顶满边界应成功
+        vm.prank(owner);
+        consumer.setCallbackGasLimit(5_000_000);
+        assertEq(consumer.callbackGasLimit(), 5_000_000);
+    }
+
     function test_setCallbackGasLimit_revert_belowMin() public {
         vm.prank(owner);
         vm.expectRevert(IEntropyConsumerBase.ErrorInvalidCallbackGasLimit.selector);
@@ -266,9 +275,10 @@ contract EntropyConsumerBaseTest is BaseTest {
     }
 
     function test_setCallbackGasLimit_revert_aboveMax() public {
+        // 2_000_001 在旧上限(2M)外、新上限(5M)内 → 不再 revert；改用越过新上限的值
         vm.prank(owner);
         vm.expectRevert(IEntropyConsumerBase.ErrorInvalidCallbackGasLimit.selector);
-        consumer.setCallbackGasLimit(2_000_001);
+        consumer.setCallbackGasLimit(5_000_001);
     }
 
     function test_setEntropyTimeout_success() public {
@@ -307,7 +317,7 @@ contract EntropyConsumerBaseTest is BaseTest {
         vm.warp(block.timestamp + dh.entropyTimeout());
         vm.deal(alice, 1 ether);
         vm.prank(alice);
-        uint64 newSeq = dh.retryRequest{value: FEE}(seq, RAND2, futureDeadline());
+        (uint64 newSeq, ) = dh.retryRequest{value: FEE}(seq, RAND2, futureDeadline());
         assertTrue(dh.getRequest(newSeq).exists);
         assertFalse(dh.getRequest(seq).exists);
 

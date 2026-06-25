@@ -16,7 +16,7 @@
 - **WHEN** 子类合约部署
 - **THEN** `entropy()` MUST 返回构造器传入的 `entropyAddress`
 - **AND** `entropyProvider()` MUST 返回构造器传入的 provider 地址
-- **AND** `callbackGasLimit()` MUST 返回 `500_000`
+- **AND** `callbackGasLimit()` MUST 返回 `2_500_000`
 - **AND** `entropyTimeout()` MUST 返回 `3600`（1 hour）
 
 #### Scenario: 零地址部署被拒绝
@@ -91,7 +91,7 @@
 
 ### Requirement: 公开 retry 入口
 
-基类 SHALL 提供 `retryRequest(uint64 oldSeq, bytes32 newUserRandomNumber, uint256 deadline) external payable returns (uint64 newSeq)`。仅当 `block.timestamp >= old.requestedAt + entropyTimeout` 或 `entropy.getRequestV2(provider, oldSeq).callbackStatus == EntropyStatusConstants.CALLBACK_FAILED` 任一成立时允许触发。仅 `_request[oldSeq].requester` 可调用。
+基类 SHALL 提供 `retryRequest(uint64 oldSeq, bytes32 newUserRandomNumber, uint256 deadline) external payable returns (uint64 newSeq, uint128 paidFee)`（`paidFee` 为本次实付的 entropy fee，等于 `RequestRetried.newFee`）。仅当 `block.timestamp >= old.requestedAt + entropyTimeout` 或 `entropy.getRequestV2(provider, oldSeq).callbackStatus == EntropyStatusConstants.CALLBACK_FAILED` 任一成立时允许触发。仅 `_request[oldSeq].requester` 可调用。
 
 #### Scenario: 超时后重试
 
@@ -103,6 +103,7 @@
 - **AND** MUST emit `RequestRetried(oldSeq, newSeq, old.requester, old.paidFee, uint128(fee))`
 - **AND** MUST 在 `_refundFee` 之前调用 `_postRetry(oldSeq, newSeq, _request[newSeq])` hook
 - **AND** 当 `msg.value > fee` 时 MUST 退还 `msg.value - fee` 给 `msg.sender`
+- **AND** MUST 返回 `(newSeq, uint128(fee))`（`paidFee` 供前端/链下记账本次实付 fee）
 
 #### Scenario: CALLBACK_FAILED 后立即重试
 
@@ -172,12 +173,12 @@
 #### Scenario: setCallbackGasLimit 边界
 
 - **GIVEN** caller 持有 `DEFAULT_ADMIN_ROLE`
-- **WHEN** 调用 `setCallbackGasLimit(newLimit)` 且 `newLimit ∈ [100_000, 2_000_000]`
+- **WHEN** 调用 `setCallbackGasLimit(newLimit)` 且 `newLimit ∈ [100_000, 5_000_000]`
 - **THEN** MUST 更新 `callbackGasLimit` 并 emit `CallbackGasLimitChanged(oldLimit, newLimit)`
 
 #### Scenario: setCallbackGasLimit 越界
 
-- **WHEN** 调用 `setCallbackGasLimit(newLimit)` 且 `newLimit < 100_000` 或 `newLimit > 2_000_000`
+- **WHEN** 调用 `setCallbackGasLimit(newLimit)` 且 `newLimit < 100_000` 或 `newLimit > 5_000_000`
 - **THEN** MUST revert with `ErrorInvalidCallbackGasLimit`
 
 #### Scenario: setEntropyTimeout 边界

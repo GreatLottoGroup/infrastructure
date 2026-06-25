@@ -1,5 +1,7 @@
 # Phase 1 Implementation Plan — `EntropyConsumerBase` 落地（infrastructure 仓）
 
+> ⚠️ **数值已于 2026-06-25 更新（本 plan 为历史实施记录，未逐行回改）：** `MAX_CALLBACK_GAS` 2_000_000 → **5_000_000**；构造期默认 `callbackGasLimit` 500_000 → **2_500_000**；`setCallbackGasLimit` 边界 `[100k, 2M]` → **`[100k, 5M]`**；`retryRequest` 返回值由 `(uint64 newSeq)` 改为 **`(uint64 newSeq, uint128 paidFee)`**。以 [entropy-consumer-base-design.md](./entropy-consumer-base-design.md) 与 `openspec/specs/entropy-consumer-base/spec.md` 为当前真值。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 `@greatlotto/infrastructure` 仓库内新增抽象基类 `EntropyConsumerBase` 与配套测试，封装 Pyth Entropy V2 请求 / 回调 / 重试 / 治理通用流程，供 ScratchCard 与 GreatLottoCore 后续阶段继承复用。

@@ -69,7 +69,7 @@ IEntropyV2 public immutable entropy;
 
 // 可变（治理）
 address public entropyProvider;          // 默认部署时传入
-uint32  public callbackGasLimit;         // 默认 500_000
+uint32  public callbackGasLimit;         // 默认 2_500_000
 uint64  public entropyTimeout;           // 默认 1 hours
 
 // Pending（3 storage slot / 条目）
@@ -97,7 +97,7 @@ mapping(uint64 sequenceNumber => Request) internal _request;
 uint64 public constant MIN_ENTROPY_TIMEOUT = 60;        // 60s
 uint64 public constant MAX_ENTROPY_TIMEOUT = 24 hours;
 uint32 public constant MIN_CALLBACK_GAS    = 100_000;
-uint32 public constant MAX_CALLBACK_GAS    = 2_000_000;
+uint32 public constant MAX_CALLBACK_GAS    = 5_000_000;
 ```
 
 ## 4. 架构与放置
@@ -158,9 +158,9 @@ EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLine
 | `entropyTimeout()` | `uint64` view | 治理可改 |
 | `entropyFee() returns (uint256)` | view | `entropy.getFeeV2(provider, callbackGasLimit)` |
 | `getRequest(uint64 seq) returns (Request)` | view | 暴露 pending（前端轮询/调试用）|
-| `retryRequest(uint64 oldSeq, bytes32 newUserRandom, uint256 deadline) returns (uint64 newSeq)` | external payable | 统一 retry 入口 |
+| `retryRequest(uint64 oldSeq, bytes32 newUserRandom, uint256 deadline) returns (uint64 newSeq, uint128 paidFee)` | external payable | 统一 retry 入口；返回新 seq + 本次实付 entropy fee |
 | `setEntropyProvider(address)` | external, `DEFAULT_ADMIN_ROLE` | provider 热切 |
-| `setCallbackGasLimit(uint32)` | external, `DEFAULT_ADMIN_ROLE` | 边界 `[100_000, 2_000_000]` |
+| `setCallbackGasLimit(uint32)` | external, `DEFAULT_ADMIN_ROLE` | 边界 `[100_000, 5_000_000]` |
 | `setEntropyTimeout(uint64)` | external, `DEFAULT_ADMIN_ROLE` | 边界 `[60s, 24h]` |
 
 ### 5.2 事件
@@ -430,7 +430,7 @@ retryRequest(oldSeq, newUserRandom, deadline)
 | retry 不存在的 seq | revert `ErrorRequestNotFound` |
 | retry `msg.value < fee` | revert `ErrorInsufficientEntropyFee` |
 | `_beforeRetry` revert | retry 整体回滚（钩子串接验证） |
-| governance setter 边界 | `setCallbackGasLimit` < 100k / > 2M revert；`setEntropyTimeout` < 60s / > 24h revert |
+| governance setter 边界 | `setCallbackGasLimit` < 100k / > 5M revert；`setEntropyTimeout` < 60s / > 24h revert |
 | governance setter 非 admin 调用 | revert AccessControl |
 | provider 切换不影响 in-flight | retry 用新 provider，老 seq 仍可在原 provider 完成回调 |
 
@@ -514,7 +514,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
     uint64 public constant MIN_ENTROPY_TIMEOUT = 60;
     uint64 public constant MAX_ENTROPY_TIMEOUT = 24 hours;
     uint32 public constant MIN_CALLBACK_GAS = 100_000;
-    uint32 public constant MAX_CALLBACK_GAS = 2_000_000;
+    uint32 public constant MAX_CALLBACK_GAS = 5_000_000;
 
     // --- Config ---
     IEntropyV2 public immutable entropy;
@@ -556,7 +556,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         if (entropy_ == address(0) || entropyProvider_ == address(0)) revert ErrorZeroAddress();
         entropy = IEntropyV2(entropy_);
         entropyProvider = entropyProvider_;
-        callbackGasLimit = 500_000;
+        callbackGasLimit = 2_500_000;
         entropyTimeout = 1 hours;
     }
 
@@ -625,7 +625,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         external
         payable
         checkDeadline(deadline)
-        returns (uint64 newSequenceNumber)
+        returns (uint64 newSequenceNumber, uint128 paidFee)
     {
         Request memory old = _request[oldSequenceNumber];
         if (!old.exists) revert ErrorRequestNotFound();

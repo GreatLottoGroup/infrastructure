@@ -14,7 +14,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
     uint64 public constant MIN_ENTROPY_TIMEOUT = 60;
     uint64 public constant MAX_ENTROPY_TIMEOUT = 24 hours;
     uint32 public constant MIN_CALLBACK_GAS = 100_000;
-    uint32 public constant MAX_CALLBACK_GAS = 2_000_000;
+    uint32 public constant MAX_CALLBACK_GAS = 5_000_000;
 
     IEntropyV2 public immutable entropy;
     address public entropyProvider;
@@ -27,7 +27,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         if (entropy_ == address(0) || entropyProvider_ == address(0)) revert ErrorZeroAddress();
         entropy = IEntropyV2(entropy_);
         entropyProvider = entropyProvider_;
-        callbackGasLimit = 500_000;
+        callbackGasLimit = 2_500_000;
         entropyTimeout = 1 hours;
         
         // 设置 owner
@@ -98,7 +98,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         uint64 oldSequenceNumber,
         bytes32 newUserRandomNumber,
         uint256 deadline
-    ) external payable nonReentrant checkDeadline(deadline) returns (uint64 newSequenceNumber) {
+    ) external payable nonReentrant checkDeadline(deadline) returns (uint64 newSequenceNumber, uint128 paidFee) {
         Request memory old = _request[oldSequenceNumber];
         if (!old.exists) revert ErrorRequestNotFound();
         if (old.requester != msg.sender) revert ErrorNotRequester();
@@ -117,11 +117,12 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
 
         _beforeRetry(oldSequenceNumber, old);
 
+        uint256 paid = msg.value;
         uint256 fee = entropyFee();
-        if (msg.value < fee) revert ErrorInsufficientEntropyFee(fee, msg.value);
+        if (paid < fee) revert ErrorInsufficientEntropyFee(fee, paid);
 
         newSequenceNumber = entropy.requestV2{value: fee}(entropyProvider, newUserRandomNumber, callbackGasLimit);
-        uint128 newFee = uint128(fee);
+        paidFee = uint128(fee);
 
         delete _request[oldSequenceNumber];
         _request[newSequenceNumber] = Request({
@@ -129,15 +130,15 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
             requester: old.requester,
             requestedAt: uint64(block.timestamp),
             itemCount: old.itemCount,
-            paidFee: newFee,
+            paidFee: paidFee,
             exists: true
         });
 
-        emit RequestRetried(oldSequenceNumber, newSequenceNumber, old.requester, old.paidFee, newFee);
+        emit RequestRetried(oldSequenceNumber, newSequenceNumber, old.requester, old.paidFee, paidFee);
 
         _postRetry(oldSequenceNumber, newSequenceNumber, _request[newSequenceNumber]);
 
-        _refundFee(msg.sender, msg.value - fee);
+        _refundFee(msg.sender, paid - fee);
     }
 
     function _beforeRetry(uint64 /*oldSequenceNumber*/, Request memory /*old*/) internal virtual {}
