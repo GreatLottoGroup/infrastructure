@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"          # 工作区根(4 仓父目录)
+ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"       # 工作区根(4 仓父目录)
 SYNC="$SCRIPT_DIR/sync-addresses.mjs"
 RPC="http://127.0.0.1:8545"
 NODE_PID=""        # 后台子 shell 的 pid(起链前用于早期失败拆链)

@@ -8,7 +8,7 @@ import { resolveNetwork } from "./sync-core.mjs";
 import { parseArgs, resolveArtifactRel, classifyDir, abiText, statusOf } from "./abi-core.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(SCRIPT_DIR, "..", "..");          // infrastructure/scripts → 工作区根
+const ROOT = join(SCRIPT_DIR, "..", "..", "..");    // infrastructure/skills/deploy-local-and-sync → 工作区根
 const DEPLOY_CFG = JSON.parse(readFileSync(join(SCRIPT_DIR, "deploy.config.json"), "utf8"));
 const ABI_CFG = JSON.parse(readFileSync(join(SCRIPT_DIR, "abi.config.json"), "utf8"));
 

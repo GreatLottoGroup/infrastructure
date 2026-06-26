@@ -10,7 +10,7 @@ import {
 } from "./sync-core.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(SCRIPT_DIR, "..", "..");          // infrastructure/scripts → 工作区根
+const ROOT = join(SCRIPT_DIR, "..", "..", "..");    // infrastructure/skills/deploy-local-and-sync → 工作区根
 const CONFIG = readJson(join(SCRIPT_DIR, "deploy.config.json"));
 
 function readJson(p) {

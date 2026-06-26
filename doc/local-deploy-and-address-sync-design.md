@@ -1,5 +1,7 @@
 # 本地一键部署 + 跨仓地址同步 设计方案
 
+> **迁移备注(2026-06-26)**:脚本已从 `infrastructure/scripts/` 迁移并封装为自包含 skill `infrastructure/skills/deploy-local-and-sync/`(原 `scripts/` 仅留运行期日志)。用法见该 skill 的 `SKILL.md`;本文档讲设计动机,文中 `scripts/...` 路径引用以 skill 目录为准。
+
 > 状态:已评审通过(brainstorming 定稿),待 `writing-plans` 出实现计划
 > 日期:2026-06-14
 > 作者:kiritoweb3 + Claude
