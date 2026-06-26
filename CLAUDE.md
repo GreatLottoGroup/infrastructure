@@ -49,6 +49,23 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js --network base --
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrum --parameters ignition/parameters/arbitrum.json --reset --verify
 ```
 
+### 本地一键部署 + 跨仓同步（skill `deploy-local-and-sync`）
+
+本地起链联调 / 把新部署地址回填下游参数与 interface `address.json` / 同步合约 ABI 到前端，走自包含 skill [skills/deploy-local-and-sync/](skills/deploy-local-and-sync/)（已软链接到 `.claude/skills/`，会话内可直接 `Skill` 调用；脚本本体即在该目录，是这套工具的唯一事实源，原 `scripts/` 仅留运行期日志）。命令均以 `infrastructure/` 为 cwd：
+
+```shell
+# 一键本地部署（清旧 → 起 hardhat node → 部署三仓 → 回填地址 → 同步 ABI；本地链跑完保留运行）
+bash skills/deploy-local-and-sync/deploy-local.sh
+
+# 单独同步地址（默认 dry-run；非本地 --write 需交互确认，--yes 跳过）
+node skills/deploy-local-and-sync/sync-addresses.mjs --network <net> [--write] [--yes] [--only sc,core,interface]
+
+# 单独同步 ABI 到 interface（前置：对应仓已 npx hardhat compile）
+node skills/deploy-local-and-sync/sync-abi.mjs [--network <net>] [--write]
+```
+
+加链 / 加合约 / 加 ABI 映射、常见错误对照见该 skill 的 `SKILL.md`；设计动机见 [doc/local-deploy-and-address-sync-design.md](doc/local-deploy-and-address-sync-design.md)。核心纯函数单测：`npm run test:scripts`。
+
 ### 环境变量（`.env`）
 
 `.env` 仅保留 RPC / 部署账号 / 验证密钥；`owner` / `supportedTokens` 已迁至 `ignition/parameters/`。
