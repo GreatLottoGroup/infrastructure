@@ -1,10 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import {
   parseArgs, resolveNetwork, isEmptyAddr,
   resolveContractAddresses, resolveEntropy,
   buildDiffs, applyDiffs, formatDiffs, getPath,
 } from "../sync-core.mjs";
+
+const REAL_CONFIG = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "deploy.config.json"), "utf8"),
+);
 
 const CONFIG = {
   networks: {
@@ -137,4 +144,24 @@ test("getPath: 字符串路径读取(interface 用)", () => {
 
 test("formatDiffs: 无变化返回占位", () => {
   assert.equal(formatDiffs([]), "(无变化)");
+});
+
+// 回归:刮刮卡奖池与彩票奖池是两个独立合约,各有独立 interface key,绝不能共用一个 mapping。
+// 曾经缺失 ScratchCardPrizePool mapping → sync 从不写 ScratchCardPrizePoolContractAddress,
+// 前端只能靠 `|| PrizePoolContractAddress` 兜底到彩票池(静默打错合约)。
+test("deploy.config: 刮刮卡奖池与彩票奖池各有独立 mapping,来源/目标互不相同", () => {
+  const scPool = REAL_CONFIG.mappings.find(
+    (m) => m.targets?.interface === "contracts.ScratchCardPrizePoolContractAddress",
+  );
+  const corePool = REAL_CONFIG.mappings.find(
+    (m) => m.targets?.interface === "contracts.PrizePoolContractAddress",
+  );
+  assert.ok(scPool, "缺少 ScratchCardPrizePool → contracts.ScratchCardPrizePoolContractAddress 映射");
+  assert.ok(corePool, "缺少 CorePrizePool → contracts.PrizePoolContractAddress 映射");
+  assert.equal(scPool.source, "scratchcard");
+  assert.equal(corePool.source, "core");
+  assert.notEqual(scPool.logical, corePool.logical);
+  // 刮刮卡奖池必须从 ScratchCard 部署产物取,不能借用彩票奖池 key
+  assert.ok(scPool.keys.every((k) => k.includes("#PrizePool")));
+  assert.ok(scPool.keys.some((k) => k.startsWith("ScratchCard")));
 });

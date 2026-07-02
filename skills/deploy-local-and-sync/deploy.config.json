@@ -29,6 +29,9 @@
     { "logical": "ScratchCardNFT", "source": "scratchcard",
       "keys": ["ScratchCardLocalModule#ScratchCardNFT", "ScratchCardModule#ScratchCardNFT"],
       "targets": { "interface": "contracts.ScratchCardNFTContractAddress" } },
+    { "logical": "ScratchCardPrizePool", "source": "scratchcard",
+      "keys": ["ScratchCardLocalModule#PrizePool", "ScratchCardModule#PrizePool"],
+      "targets": { "interface": "contracts.ScratchCardPrizePoolContractAddress" } },
 
     { "logical": "GreatLotto", "source": "core",
       "keys": ["GreatLottoCoreLocal#GreatLotto", "GreatLottoCore#GreatLotto"],
