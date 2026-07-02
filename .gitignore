@@ -30,3 +30,4 @@ pnpm-workspace.yaml
 
 # 本地一键部署的 hardhat node 运行日志
 scripts/.hardhat-node.log
+skills/deploy-local-and-sync/.hardhat-node.log
