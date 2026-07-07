@@ -45,7 +45,9 @@ module.exports = {
     // 本地节点（chainId 31337，先 `anvil` 或 `npx hardhat node` 起一个本地链）。
     // 账户用本地节点内置的解锁账号，无需 .env 私钥。
     localhost: {
-        url: "http://127.0.0.1:8545",
+        // HARDHAT_LOCALHOST_URL lets the e2e harness point this at its dedicated anvil
+        // (e.g. :8546) so its deploy never touches a developer's local :8545 dev chain.
+        url: process.env.HARDHAT_LOCALHOST_URL || "http://127.0.0.1:8545",
         chainId: 31337,
     },
     base: {
