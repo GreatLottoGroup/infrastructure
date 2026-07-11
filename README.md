@@ -8,12 +8,11 @@ GreatLottoGroup 平台的底层代币基础设施合约（Solidity 0.8.26 + Open
 
 | 合约 | 符号 | 用途 |
 |---|---|---|
-| `GreatLottoCoin` | GLC | ERC20 资产币，与稳定币 1:1 锚定（**仅支持 USDT、USDC**） |
-| `DaoCoin` | GLDC | 治理币（ERC20Votes），按 `coinPrice` 单一定价铸造 |
-| `DaoBenefitPool` | — | 单轨分润池，将 GLC 余额按持仓比例分发给 GLDC 受益人 |
-| `SalesChannel` | — | 销售渠道注册与启用/禁用 |
+| `GreatLottoCoin` | GLC | ERC20 资产币，与稳定币 1:1 锚定（**当前仅支持 USDC**，白名单可扩展） |
+| `SalesVault` | GLSV | ERC4626 销售利润金库；销售分润注入抬高份额净值，份额持有人凭 `redeem`/`withdraw` 按比例提走 GLC |
+| `SalesChannel` | — | 销售渠道注册表 + 渠道分润托管账本（PARTNER `creditChannel` 记账、渠道方 `withdraw` 自提，pull payment） |
 
-> **注**：原 `GreatLottoEth` (GLETH) 已下线；`SelfPermit` 仅保留 EIP-2612 标准入口；`_tokens` 白名单中已移除 DAI（详见 `openspec/changes/archive/`）。
+> **注**：原 `GreatLottoEth` (GLETH) 与 DAO 分红机制（`DaoCoin` / `DaoBenefitPool`）均已下线——销售分润改由 `SalesVault`（ERC4626）承接；`SelfPermit` 仅保留 EIP-2612 标准入口；`_tokens` 白名单中已移除 DAI（详见 `openspec/changes/archive/`）。合约机制详解见根目录 [WhitePaper_ZH.md](WhitePaper_ZH.md)（英文版 [WhitePaper_EN.md](WhitePaper_EN.md)）。
 
 ## 常用命令
 
