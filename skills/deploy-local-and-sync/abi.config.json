@@ -10,7 +10,6 @@
     { "file": "GreatLotto.json",           "source": "core", "artifact": "contracts/GreatLotto.sol/GreatLotto" },
     { "file": "GreatLottoNFT.json",        "source": "core", "artifact": "contracts/GreatLottoNFT.sol/GreatLottoNFT" },
     { "file": "InvestmentPosition.json",    "source": "core", "artifact": "contracts/InvestmentPosition.sol/InvestmentPosition" },
-    { "file": "InvestmentPositionSVG.json", "source": "core", "artifact": "contracts/InvestmentPositionSVG.sol/InvestmentPositionSVG" },
 
     { "file": "SalesVault.json",           "source": "infrastructure", "artifact": "contracts/SalesVault.sol/SalesVault" },
     { "file": "SalesChannel.json",         "source": "infrastructure", "artifact": "contracts/SalesChannel.sol/SalesChannel" },
