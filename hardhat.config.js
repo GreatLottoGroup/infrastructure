@@ -79,40 +79,12 @@ module.exports = {
   },
 
   etherscan: {
-    // apiKey 的 key 必须与链名（内置链名 / customChains[].network）一致
-    // arbitrumOne(42161) 用 hardhat-verify 内置链配置，无需 customChain
-    apiKey: {
-        base: `${process.env.BASESCAN_API_KEY}`,
-        baseSepolia: `${process.env.BASESCAN_API_KEY}`,
-        arbitrumOne: `${process.env.ARBISCAN_API_KEY}`,
-        arbitrumSepolia: `${process.env.ARBISCAN_API_KEY}`,
-    },
-    customChains: [
-        {
-            network: "base",
-            chainId: 8453,
-            urls: {
-              apiURL: "https://api.basescan.org/api",
-              browserURL: "https://basescan.org",
-            },
-        },
-        {
-            network: "baseSepolia",
-            chainId: 84532,
-            urls: {
-              apiURL: "https://api-sepolia.basescan.org/api",
-              browserURL: "https://sepolia.basescan.org",
-            },
-        },
-        {
-            network: "arbitrumSepolia",
-            chainId: 421614,
-            urls: {
-              apiURL: "https://api-sepolia.arbiscan.io/api",
-              browserURL: "https://sepolia.arbiscan.io",
-            },
-        }
-    ]
+    // Etherscan V2 统一 API：apiKey 必须是「单个字符串」（一把 etherscan.io key 通吃全链）。
+    // 传对象（各链独立 key）会被 hardhat-verify 判定为 V1 → 命中已停用的 V1 endpoint
+    // （如 api-sepolia.arbiscan.io/api）→ 报 "deprecated V1 endpoint"。
+    // base(8453)/arbitrumOne(42161)/baseSepolia(84532)/arbitrumSepolia(421614) 均在
+    // hardhat-verify 内置 chain-config，V2 按 chainid 路由，无需 customChains。
+    apiKey: process.env.ETHERSCAN_API_KEY,
   },
 
 
