@@ -1,0 +1,19 @@
+{
+  "endpoint": "https://www.4byte.directory/api/v1/import-abi/",
+  "recordDir": "interface/src/app/abi/4byte.directory",
+  "repos": { "infrastructure": "infrastructure", "scratchcard": "ScratchCard", "core": "GreatLottoCore" },
+  "contracts": [
+    { "name": "ScratchCard.json",         "source": "scratchcard",    "artifact": "contracts/ScratchCard.sol/ScratchCard" },
+    { "name": "ScratchCardNFT.json",       "source": "scratchcard",    "artifact": "contracts/ScratchCardNFT.sol/ScratchCardNFT" },
+    { "name": "ScratchCardPrizePool.json", "source": "scratchcard",    "artifact": "contracts/PrizePool.sol/PrizePool" },
+
+    { "name": "GreatLotto.json",           "source": "core",           "artifact": "contracts/GreatLotto.sol/GreatLotto" },
+    { "name": "GreatLottoNFT.json",        "source": "core",           "artifact": "contracts/GreatLottoNFT.sol/GreatLottoNFT" },
+    { "name": "PrizePool.json",            "source": "core",           "artifact": "contracts/PrizePool.sol/PrizePool" },
+    { "name": "InvestmentPosition.json",   "source": "core",           "artifact": "contracts/InvestmentPosition.sol/InvestmentPosition" },
+
+    { "name": "GreatLottoCoin.json",       "source": "infrastructure", "artifact": "contracts/GreatLottoCoin.sol/GreatLottoCoin" },
+    { "name": "SalesChannel.json",         "source": "infrastructure", "artifact": "contracts/SalesChannel.sol/SalesChannel" },
+    { "name": "SalesVault.json",           "source": "infrastructure", "artifact": "contracts/SalesVault.sol/SalesVault" }
+  ]
+}

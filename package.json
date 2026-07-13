@@ -7,7 +7,7 @@
     "test": "forge test",
     "gas": "forge test --gas-report",
     "coverage": "forge coverage --report summary",
-    "test:scripts": "node --test \"skills/deploy-local-and-sync/test/**/*.test.mjs\"",
+    "test:scripts": "node --test \"skills/**/test/**/*.test.mjs\"",
     "compile": "hardhat compile"
   },
   "repository": {
