@@ -25,10 +25,14 @@ abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
      * @inheritdoc AccessControl
      */    
     function grantRole(bytes32 role, address account) public virtual override onlyRole(getRoleAdmin(role)) {
-        // 判断地址必须为合约地址
+        // 零地址守卫：任何角色都不得授予 address(0)
         if(account == address(0)){
             revert ErrorZeroAddress();
-        }else if(!_isContract(account)){
+        }
+        // 合约地址守卫仅对 PARTNER_CONTRACT_ROLE 生效：partner 必须是审计过的合约、绝不能是 EOA。
+        // 其它角色（含 DEFAULT_ADMIN_ROLE）不受此限，可授予 EOA / 多签，与原生 OZ AccessControl 一致，
+        // 以支持部署后转移/追加管理员。
+        if(role == PARTNER_CONTRACT_ROLE && !_isContract(account)){
             revert ErrorInvalidAddress(account);
         }
 

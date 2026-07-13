@@ -452,7 +452,7 @@ Mock entropy 用 Pyth 官方 `MockEntropy`（SC 已经在 `contracts/test/MockEn
 | **Storage 布局** | SC `_pending` (3 槽) → 基类 `_request` (3 槽，相同槽内排列顺序)。SC 未主网部署，layout 可自由变。GLC 同理。|
 | **公开 ABI 变化** | `retryDraw → retryRequest`、`retryBlockGap` 移除 / 新增 `entropyTimeout`、retry 事件统一为 `RequestRetried`。两边前端（interface 仓 + GLC 前端）需要同步改。本设计要求**前后端一并升级**，不留兼容垫片。|
 | **ABI 兼容**（治理事件） | 旧 `EntropyProviderChanged(newProvider)` 增加 `oldProvider` 字段（重命名同名事件，参数列表变化）。前端订阅需更新。|
-| **`AccessControlPartnerContract` 互操作** | 基类用普通 `AccessControl`；子类如继续使用 `AccessControlPartnerContract`，覆盖 `grantRole` 行为不受影响——不属于本提案引入的新约束。|
+| **`AccessControlPartnerContract` 互操作** | 基类用普通 `AccessControl`；子类如继续使用 `AccessControlPartnerContract`，其覆盖的 `grantRole` 行为不受本提案影响——不属于本提案引入的新约束。（注：`grantRole` 的「必须是合约地址」校验已在 `grantrole-role-gated-contract-check` change 中改为**仅对 `PARTNER_CONTRACT_ROLE` 生效**；`DEFAULT_ADMIN_ROLE` 可授予 EOA/多签。）|
 
 ## 10. YAGNI 边界（明确不做）
 

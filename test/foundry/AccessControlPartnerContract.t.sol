@@ -83,6 +83,24 @@ contract AccessControlPartnerContractTest is BaseTest {
         acpc.grantRole(PARTNER_ROLE, address(tiny));
     }
 
+    // ---------------------------------------------------------------------
+    // grantRole — 合约地址守卫仅限 PARTNER（DEFAULT_ADMIN_ROLE 可授 EOA）
+    // ---------------------------------------------------------------------
+
+    function test_grantRole_success_forEOA_whenAdminRole() public {
+        // DEFAULT_ADMIN_ROLE 不受合约地址守卫约束：owner 可把管理员授予一个 EOA / 多签（支持管理员转移）
+        vm.prank(owner);
+        acpc.grantRole(ADMIN_ROLE, alice);
+        assertTrue(acpc.hasRole(ADMIN_ROLE, alice));
+    }
+
+    function test_grantRole_revert_whenZeroAddress_forAdminRole() public {
+        // 零地址守卫对所有角色生效：DEFAULT_ADMIN_ROLE 亦不得授予 address(0)
+        vm.prank(owner);
+        vm.expectRevert(IErrorsBase.ErrorZeroAddress.selector);
+        acpc.grantRole(ADMIN_ROLE, address(0));
+    }
+
     function test_grantRole_revert_whenCallerNotAdmin() public {
         ACPCHarness grantee = new ACPCHarness(owner);
         vm.prank(alice);
