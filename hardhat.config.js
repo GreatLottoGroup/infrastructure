@@ -82,9 +82,24 @@ module.exports = {
     // Etherscan V2 统一 API：apiKey 必须是「单个字符串」（一把 etherscan.io key 通吃全链）。
     // 传对象（各链独立 key）会被 hardhat-verify 判定为 V1 → 命中已停用的 V1 endpoint
     // （如 api-sepolia.arbiscan.io/api）→ 报 "deprecated V1 endpoint"。
-    // base(8453)/arbitrumOne(42161)/baseSepolia(84532)/arbitrumSepolia(421614) 均在
-    // hardhat-verify 内置 chain-config，V2 按 chainid 路由，无需 customChains。
     apiKey: process.env.ETHERSCAN_API_KEY,
+    // ⚠️ Ignition 的 --verify 不读 hardhat-verify 的内置 chain-config，而是用 ignition-core
+    // 自带的一份**独立且过时**的 builtinChains：base(8453)/arbitrumOne(42161)/
+    // arbitrumSepolia(421614) 有，但只收了旧 baseGoerli(84531)、**缺 baseSepolia(84532)**
+    // → `ignition deploy --network baseSepolia --verify` 抛 IGN1002。
+    // resolveChainConfig 是 [...customChains, ...builtinChains].find()，故在此补一条即可。
+    // V2 单串 key 下 Etherscan 类会把 apiURL 覆盖成统一端点 https://api.etherscan.io/v2/api
+    // 并附 ?chainid=84532 路由，故下方 apiURL 仅占位、browserURL 用于成功回显链接。
+    customChains: [
+      {
+        network: "baseSepolia",
+        chainId: 84532,
+        urls: {
+          apiURL: "https://api-sepolia.basescan.org/api",
+          browserURL: "https://sepolia.basescan.org",
+        },
+      },
+    ],
   },
 
 
