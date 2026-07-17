@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 首次 / CI 需先装 forge-std（lib/ 已 gitignore，不入库；断网回退 git clone --depth 1）
 forge install foundry-rs/forge-std
 
-forge test                       # 全部（9 单测 + 2 invariant）；= npm test
+forge test                       # 全部（7 单测 + 3 invariant）；= npm test
 forge test --match-path test/foundry/PrizePoolBase.t.sol   # 单文件
 forge test --gas-report          # gas 报告；= npm run gas
 forge coverage --report summary   # 覆盖率；= npm run coverage
@@ -84,8 +84,7 @@ node skills/deploy-local-and-sync/sync-abi.mjs [--network <net>] [--write]
 
 - `ALCHEMY_API_KEY` — Alchemy API Key，用于所有 RPC 节点及默认 hardhat 分叉
 - `DEPLOY_ACCOUNT_PRIVATE_KEY` — 部署账户私钥
-- `BASESCAN_API_KEY` — Base 主网 / Base Sepolia 合约验证
-- `ARBISCAN_API_KEY` — Arbitrum One / Arbitrum Sepolia 合约验证
+- `ETHERSCAN_API_KEY` — Etherscan V2 统一 API，一把 etherscan.io key 通吃 Base / Arbitrum 全链合约验证（旧的 `BASESCAN_API_KEY` / `ARBISCAN_API_KEY` 已停用）
 
 ## 架构说明
 

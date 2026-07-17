@@ -31,7 +31,7 @@ npx hardhat compile                # 编译 + 产出 ABI（供下游与 interfac
 npx hardhat clean
 ```
 
-> 测试**全本地化、无需 fork**（底层稳定币用 6 位 ERC20Permit mock）。`test/foundry/` 含 9 单测 + 2 invariant；辅助合约在 `test/foundry/{mocks,harness}/`。
+> 测试**全本地化、无需 fork**（底层稳定币用 6 位 ERC20Permit mock）。`test/foundry/` 含 7 单测 + 3 invariant；辅助合约在 `test/foundry/{mocks,harness}/`。
 > 注：`forge build` 不依赖 forge-std，缺它仍能编过、只有 `forge test` 报错——别被 build 通过误导。
 
 ## 接口文档（NatSpec + forge doc）
@@ -82,8 +82,7 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js \
 ```
 ALCHEMY_API_KEY=...
 DEPLOY_ACCOUNT_PRIVATE_KEY=...
-BASESCAN_API_KEY=...
-ARBISCAN_API_KEY=...
+ETHERSCAN_API_KEY=...
 ```
 
 ## NPM 发布
