@@ -3,7 +3,7 @@
 | Item | Detail |
 |---|---|
 | Document version | v1.0 |
-| Corresponding code version | `@greatlotto/infrastructure` v0.1.2 |
+| Corresponding code version | `@greatlotto/infrastructure` v0.1.3 |
 | Dependencies | OpenZeppelin Contracts v5.6.x |
 | License | GPL-3.0 |
 | Last updated | 2026-07-11 |
@@ -114,7 +114,7 @@ flowchart TB
 
 The three contracts share a set of abstract bases / libraries (`contracts/base/`, `contracts/interfaces/`) that are prerequisites for understanding their security properties:
 
-- **`AccessControlPartnerContract`**: `AccessControl` + `PARTNER_CONTRACT_ROLE`. At construction it grants `DEFAULT_ADMIN_ROLE` to `owner_` (falls back to the deployer if the zero address), and overrides `grantRole` — when granting any role it checks the target is a contract (`_isContract`: `code.length > 1000`), otherwise `revert ErrorInvalidAddress`. This is the enforcement point for "sensitive entries grant contracts only, never EOAs."
+- **`AccessControlPartnerContract`**: `AccessControl` + `PARTNER_CONTRACT_ROLE`. At construction it grants `DEFAULT_ADMIN_ROLE` to `owner_` (falls back to the deployer if the zero address), and overrides `grantRole` — granting **any role** to the zero address reverts `ErrorZeroAddress`; only when granting `PARTNER_CONTRACT_ROLE` does it additionally require the target to be a contract (`_isContract`: `code.length > 1000`), otherwise `revert ErrorInvalidAddress`; other roles (including `DEFAULT_ADMIN_ROLE`) are exempt from the contract check and may be granted to EOAs / multisigs. This is the enforcement point for "sensitive entries grant contracts only, never EOAs."
 - **`NoDelegateCall`**: records this contract's address at construction and compares at runtime, blocking `delegatecall` into sensitive functions (preventing storage / ledger tampering in a proxy context).
 - **`DeadLine`**: the `checkDeadline(deadline)` modifier `revert`s an expired transaction, used on entries with user-signature / time-sensitive semantics.
 - **`SelfPermit`**: EIP-2612 standard `permit` entries (`selfPermit` / `selfPermitIfNecessary`), letting an EOA complete "approve + call" in a single transaction.
@@ -393,7 +393,7 @@ User pays stablecoin (USDC)
 | Benefit tier | Factory value | Hard cap | Adjustability |
 |---|---|---|---|
 | Channel benefit rate `channelBenefitRate` | **5%** (50‰) | `MAX_CHANNEL_BENEFIT_RATE = 50‰` | Fixed at construction, **no runtime setter** (strengthens channel trust) |
-| Sales benefit rate `sellBenefitRate` | **5%** (50‰) | `MAX_SELL_BENEFIT_RATE = 50‰` | Adjustable via `setSellBenefitRate`, subject to the same hard cap |
+| Sales benefit rate `sellBenefitRate` | **5%** (50‰) | `MAX_SELL_BENEFIT_RATE = 50‰` | Adjustable via `setSellBenefitRate`, subject to the same hard cap; a zero rate is rejected (`ErrorInvalidAmount`) |
 
 - Benefit is computed in per-mille (`benefit = amount × rate / 1000`).
 - When there is **no channel** (`channelId == 0`), the channel benefit tier is merged into the sales tier and goes entirely to SalesVault.

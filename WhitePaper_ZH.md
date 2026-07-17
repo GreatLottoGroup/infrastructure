@@ -5,7 +5,7 @@
 | 项目 | 说明 |
 |---|---|
 | 文档版本 | v1.0 |
-| 对应代码版本 | `@greatlotto/infrastructure` v0.1.2 |
+| 对应代码版本 | `@greatlotto/infrastructure` v0.1.3 |
 | 依赖 | OpenZeppelin Contracts v5.6.x |
 | 开源协议 | GPL-3.0 |
 | 最后更新 | 2026-07-11 |
@@ -114,7 +114,7 @@ flowchart TB
 
 三个合约共用一批抽象基类 / 库（`contracts/base/`、`contracts/interfaces/`），是理解其安全属性的前提：
 
-- **`AccessControlPartnerContract`**：`AccessControl` + `PARTNER_CONTRACT_ROLE`。构造时把 `DEFAULT_ADMIN_ROLE` 授给 `owner_`（为零地址则回退部署者），并重写 `grantRole`——授任何角色时校验目标地址必须是合约（`_isContract`：`code.length > 1000`），否则 `revert ErrorInvalidAddress`。这是「敏感入口只授合约、不授 EOA」的强制点。
+- **`AccessControlPartnerContract`**：`AccessControl` + `PARTNER_CONTRACT_ROLE`。构造时把 `DEFAULT_ADMIN_ROLE` 授给 `owner_`（为零地址则回退部署者），并重写 `grantRole`——授**任何角色**给零地址均 `revert ErrorZeroAddress`；仅当授 `PARTNER_CONTRACT_ROLE` 时才额外校验目标地址必须是合约（`_isContract`：`code.length > 1000`），否则 `revert ErrorInvalidAddress`；其余角色（含 `DEFAULT_ADMIN_ROLE`）不受合约校验约束，可授予 EOA / 多签。这是「敏感入口只授合约、不授 EOA」的强制点。
 - **`NoDelegateCall`**：构造期记录本合约地址，运行时比对，阻止经 `delegatecall` 进入敏感函数（防止在代理上下文中篡改存储 / 记账）。
 - **`DeadLine`**：`checkDeadline(deadline)` 修饰器，交易过期即 `revert`，用于带用户签名 / 时效语义的入口。
 - **`SelfPermit`**：EIP-2612 标准 `permit` 入口（`selfPermit` / `selfPermitIfNecessary`），使 EOA 能在单笔交易内完成「授权 + 调用」。
@@ -393,7 +393,7 @@ SalesVault 的治理面被压到极小：
 | 分润档 | 出厂值 | 硬上限 | 可调性 |
 |---|---|---|---|
 | 渠道分润率 `channelBenefitRate` | **5%**（50‰） | `MAX_CHANNEL_BENEFIT_RATE = 50‰` | 构造期固定，**无运行时 setter**（增强渠道方信任） |
-| 销售分润率 `sellBenefitRate` | **5%**（50‰） | `MAX_SELL_BENEFIT_RATE = 50‰` | 可经 `setSellBenefitRate` 调整，受同一硬上限约束 |
+| 销售分润率 `sellBenefitRate` | **5%**（50‰） | `MAX_SELL_BENEFIT_RATE = 50‰` | 可经 `setSellBenefitRate` 调整，受同一硬上限约束；传 0 拒绝（`ErrorInvalidAmount`） |
 
 - 分润以千分比计（`benefit = amount × rate / 1000`）。
 - **无渠道**（`channelId == 0`）时，渠道分润档并入销售档，一起进 SalesVault。
