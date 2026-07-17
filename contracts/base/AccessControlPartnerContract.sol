@@ -4,8 +4,15 @@ pragma solidity ^0.8.26;
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import "../interfaces/IErrorsBase.sol";
 
+/// @title AccessControlPartnerContract
+/// @notice OpenZeppelin AccessControl extended with a `PARTNER_CONTRACT_ROLE` that may only be granted to audited
+///         contracts (never EOAs), used to gate cross-contract entry points.
+/// @dev    `grantRole` is overridden to reject the zero address for any role, and to require that any account
+///         granted `PARTNER_CONTRACT_ROLE` is a contract (code size > 1000). Other roles (including
+///         `DEFAULT_ADMIN_ROLE`) may still be granted to EOAs / multisigs, matching native OZ behavior.
 abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
 
+    /// @notice Role granted only to audited partner contracts (never EOAs) to authorize cross-contract calls.
     bytes32 public constant PARTNER_CONTRACT_ROLE = keccak256("PARTNER_CONTRACT_ROLE");
 
     constructor(address owner_){
@@ -25,13 +32,13 @@ abstract contract AccessControlPartnerContract is AccessControl, IErrorsBase{
      * @inheritdoc AccessControl
      */    
     function grantRole(bytes32 role, address account) public virtual override onlyRole(getRoleAdmin(role)) {
-        // 零地址守卫：任何角色都不得授予 address(0)
+        // Zero-address guard: no role may be granted to address(0).
         if(account == address(0)){
             revert ErrorZeroAddress();
         }
-        // 合约地址守卫仅对 PARTNER_CONTRACT_ROLE 生效：partner 必须是审计过的合约、绝不能是 EOA。
-        // 其它角色（含 DEFAULT_ADMIN_ROLE）不受此限，可授予 EOA / 多签，与原生 OZ AccessControl 一致，
-        // 以支持部署后转移/追加管理员。
+        // Contract-address guard applies only to PARTNER_CONTRACT_ROLE: a partner must be an audited contract,
+        // never an EOA. Other roles (including DEFAULT_ADMIN_ROLE) are exempt and may be granted to EOAs /
+        // multisigs, consistent with native OZ AccessControl, to support post-deploy admin transfer / addition.
         if(role == PARTNER_CONTRACT_ROLE && !_isContract(account)){
             revert ErrorInvalidAddress(account);
         }

@@ -19,6 +19,9 @@ out
 cache_forge
 lib
 
+# forge doc generated output (regenerate via `pnpm docs`)
+docs
+
 #ignition
 ignition/deployments
 .claude/settings.json

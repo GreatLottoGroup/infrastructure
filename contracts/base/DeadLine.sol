@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.26;
 
-/// @title Prevents delegatecall to a contract
-/// @notice Base contract that provides a modifier for preventing delegatecall to methods in a child contract
+/// @title DeadLine
+/// @notice Base contract providing a `checkDeadline` modifier that reverts once a transaction's deadline has passed.
+/// @dev    `deadline` is a unix timestamp in seconds; reverts `DeadLineExpiredTransaction` when
+///         `block.timestamp > deadline`.
 abstract contract DeadLine {
     /**
      * @dev DeadLine: Transaction is too old

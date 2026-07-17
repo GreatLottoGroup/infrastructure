@@ -34,6 +34,18 @@ npx hardhat clean
 > 测试**全本地化、无需 fork**（底层稳定币用 6 位 ERC20Permit mock）。`test/foundry/` 含 9 单测 + 2 invariant；辅助合约在 `test/foundry/{mocks,harness}/`。
 > 注：`forge build` 不依赖 forge-std，缺它仍能编过、只有 `forge test` 报错——别被 build 通过误导。
 
+## 接口文档（NatSpec + forge doc）
+
+主合约所有对外方法均有英文 NatSpec 注释。用 Foundry 原生 `forge doc` 一键生成 markdown 接口文档，并用零依赖 checker 校验完整性（缺注释即非零退出）：
+
+```shell
+npm run docs        # forge doc → docs/（已 gitignore，按需重生）
+npm run docs:serve  # 本地 mdbook 预览（http://localhost:4000）
+npm run docs:lint   # forge build --ast --force + 校验所有 external/public 方法都有 @notice/@param/@return
+```
+
+> 本仓是基类文档的**权威来源**：下游仓（ScratchCard / GreatLottoCore）继承本仓 `EntropyConsumerBase` / `PrizePoolBase` 的对外 API，其合约页交叉链接回本仓文档。规范见工作区 `.claude-workspace/knowledge/conventions/natspec.md`。
+
 ## 部署
 
 部署参数走 Ignition 参数文件（每条链一份，见 [ignition/parameters/](ignition/parameters/)），不再走 `.env`。

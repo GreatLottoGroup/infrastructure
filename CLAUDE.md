@@ -32,6 +32,18 @@ npx hardhat compile   # 编译 + 产出 ABI（供下游 ScratchCard/Core 与 int
 npx hardhat clean
 ```
 
+### 接口文档（NatSpec + forge doc）
+
+主合约所有对外方法均有英文 NatSpec（规范见 `.claude-workspace/knowledge/conventions/natspec.md`）。**本仓是基类文档权威源**（下游继承 `EntropyConsumerBase`/`PrizePoolBase` 的对外 API 交叉链接回本仓）。
+
+```shell
+npm run docs        # forge doc → docs/（已 gitignore，按需重生）
+npm run docs:serve  # 本地 mdbook 预览 http://localhost:4000
+npm run docs:lint   # forge build --ast --force + 零依赖 tools/check-natspec.mjs 校验所有 external/public 方法有 @notice/@param/@return
+```
+
+> ⚠️ **不用 `@defi-wonderland/natspec-smells`**：它自行重编译且不开 viaIR，会 stack-too-deep 崩（同 `forge coverage --ir-minimum` 老毛病）；checker 改读 forge 已 viaIR 编译的 AST 绕过。NatSpec 正文别写 `@greatlotto/...`（solc 当非法标签报错）。
+
 ### 部署
 
 > 部署参数走 Ignition 参数文件（`ignition/parameters/<network>.json`，每条链一份；`owner` / `supportedTokens` 不再读 `.env`）。

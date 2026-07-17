@@ -3,6 +3,11 @@ pragma solidity ^0.8.26;
 
 import {IErrorsBase} from "./IErrorsBase.sol";
 
+/// @title IEntropyConsumerBase
+/// @notice Contract interface for the asynchronous Pyth Entropy V2 consumer base: request/retry a random draw,
+///         read a pending request, and govern the entropy provider / callback gas / timeout parameters.
+/// @dev    Randomness is delivered in two phases (request then provider callback). Amounts paid for entropy are
+///         in wei (native gas token); timeouts and deadlines are unix timestamps / durations in seconds.
 interface IEntropyConsumerBase is IErrorsBase {
     struct Request {
         uint256 tokenId;
@@ -45,27 +50,41 @@ interface IEntropyConsumerBase is IErrorsBase {
     error ErrorInvalidCallbackGasLimit();
     error ErrorRefundFailed();
 
-    /// @notice 当前 entropy fee（= entropy.getFeeV2(provider, callbackGasLimit)）
+    /// @notice The current entropy fee (in wei), equal to `entropy.getFeeV2(provider, callbackGasLimit)`.
+    /// @return The entropy fee in wei.
     function entropyFee() external view returns (uint256);
 
-    /// @notice 读取某个 sequenceNumber 的请求记录（不存在则 exists=false 的空结构）
+    /// @notice Read the request record for a given sequence number.
+    /// @param  sequenceNumber The Pyth sequence number to look up.
+    /// @return The stored `Request` (an empty struct with `exists == false` when not found).
     function getRequest(uint64 sequenceNumber) external view returns (Request memory);
 
-    /// @notice 重新触发一个已超时 / 回调失败的随机请求；支付新的 entropy fee。
-    /// @return newSequenceNumber 新的 Pyth sequenceNumber
-    /// @return paidFee 本次实付的 entropy fee（与 RequestRetried.newFee 一致）
+    /// @notice Retry a timed-out or callback-failed randomness request by paying a fresh entropy fee.
+    /// @dev    Only the original requester may retry, and only once the request has timed out or its Pyth
+    ///         callback has failed; the old request record is deleted and replaced by the new one. Requires
+    ///         `msg.value >= entropyFee()`; overpayment is refunded. `newUserRandomNumber` must be non-zero.
+    /// @param  oldSequenceNumber   The sequence number of the stalled request being retried.
+    /// @param  newUserRandomNumber A fresh non-zero user-supplied random seed for the new request.
+    /// @param  deadline            Transaction deadline, a unix timestamp in seconds.
+    /// @return newSequenceNumber The new Pyth sequence number.
+    /// @return paidFee The entropy fee actually paid this time (in wei; matches `RequestRetried.newFee`).
     function retryRequest(
         uint64 oldSequenceNumber,
         bytes32 newUserRandomNumber,
         uint256 deadline
     ) external payable returns (uint64 newSequenceNumber, uint128 paidFee);
 
-    /// @notice 治理：切换 entropy provider（仅 DEFAULT_ADMIN_ROLE）
+    /// @notice Governance: switch the entropy provider. Restricted to `DEFAULT_ADMIN_ROLE`.
+    /// @param  newProvider The new entropy provider address (must be non-zero).
     function setEntropyProvider(address newProvider) external;
 
-    /// @notice 治理：调整回调 gas 上限，范围 [MIN_CALLBACK_GAS, MAX_CALLBACK_GAS]（仅 DEFAULT_ADMIN_ROLE）
+    /// @notice Governance: adjust the callback gas limit, within `[MIN_CALLBACK_GAS, MAX_CALLBACK_GAS]`.
+    ///         Restricted to `DEFAULT_ADMIN_ROLE`.
+    /// @param  newLimit The new callback gas limit.
     function setCallbackGasLimit(uint32 newLimit) external;
 
-    /// @notice 治理：调整请求超时窗口，范围 [MIN_ENTROPY_TIMEOUT, MAX_ENTROPY_TIMEOUT]（仅 DEFAULT_ADMIN_ROLE）
+    /// @notice Governance: adjust the request timeout window (in seconds), within
+    ///         `[MIN_ENTROPY_TIMEOUT, MAX_ENTROPY_TIMEOUT]`. Restricted to `DEFAULT_ADMIN_ROLE`.
+    /// @param  newTimeout The new timeout in seconds.
     function setEntropyTimeout(uint64 newTimeout) external;
 }

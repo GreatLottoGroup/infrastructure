@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.26;
 
-/// @title Callback for IUniswapV3PoolActions#mint
-/// @notice Any contract that calls IUniswapV3PoolActions#mint must implement this interface
+/// @title IErrorsBase
+/// @notice Shared custom errors reused across GreatLotto infrastructure contracts and their downstreams.
+/// @dev    Contracts inherit this interface (`is IErrorsBase`) so they revert with a common error vocabulary
+///         (invalid amount / address, unsuccessful payment, insufficient balance, zero / unsupported token).
 interface IErrorsBase {
 
     /**

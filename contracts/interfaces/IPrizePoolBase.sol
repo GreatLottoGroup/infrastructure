@@ -1,37 +1,58 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.26;
 
+/// @title IPrizePoolBase
+/// @notice Contract interface for the prize-pool base: pull-based payout fallback (claim / query) and
+///         benefit-rate governance (sell rate setter + read-only channel / sell rate getters).
+/// @dev    All amounts are in wei of the settlement currency GLC. Benefit rates are expressed in per-mille
+///         (denominator 1000); both the channel rate and sell rate are capped at 5% (= 50 per-mille).
 interface IPrizePoolBase {
 
+    /// @notice Emitted when the sell benefit rate is changed via `setSellBenefitRate`.
     event SellBenefitRateChanged(uint16 rate);
 
-    // 付奖兜底（push 付款失败 → 转 pull 模式）：记账与提取事件，coin 始终为资产币 GLC
+    /// @notice Payout fallback: a push payment failed and was recorded for pull withdrawal. `coin` is always GLC.
     event PayoutPending(address indexed user, address indexed coin, uint256 amount);
+    /// @notice Payout fallback: a previously-pending payout was claimed by the user. `coin` is always GLC.
     event PayoutClaimed(address indexed user, address indexed coin, uint256 amount);
 
-    // 无可提取的兜底欠款时 revert
+    /// @dev Reverts when `claimPayout` is called but the user has no pending fallback payout.
     error ErrorNoPendingPayout();
 
-    // `_payoutTransfer` 仅允许本合约经 `this.` 自调用；非自调用时 revert（供下游软付款 frame 隔离守卫）
+    /// @dev Reverts when `_payoutTransfer` is not invoked via the contract's own `this.` self-call
+    ///      (the soft-payment frame-isolation guard).
     error ErrorUnauthorizedSelfCall();
 
-    // 销售分润率（构造初值 / setSellBenefitRate 入参）超过硬上限 MAX_SELL_BENEFIT_RATE（5% = 50‰）时 revert
+    /// @dev Reverts when a sell rate (constructor initial value or `setSellBenefitRate` input) exceeds the
+    ///      hard cap `MAX_SELL_BENEFIT_RATE` (5% = 50 per-mille).
     error ErrorSellRateTooHigh(uint16 rate, uint16 max);
 
-    // 构造初值 initialChannelRate 超过硬上限 MAX_CHANNEL_BENEFIT_RATE（5% = 50‰）时 revert。
-    // 渠道率部署后不可改（无 setter），故仅在构造期校验。
+    /// @dev Reverts when the constructor `initialChannelRate` exceeds the hard cap `MAX_CHANNEL_BENEFIT_RATE`
+    ///      (5% = 50 per-mille). The channel rate is immutable after deployment (no setter), so it is only
+    ///      validated at construction time.
     error ErrorChannelRateTooHigh(uint16 rate, uint16 max);
 
-    // 渠道分润率为构造期固定值，无运行时 setter（治理面收敛）；销售分润率可调但有硬上限。
+    /// @notice Governance: set the sell benefit rate. Restricted to `DEFAULT_ADMIN_ROLE`.
+    /// @dev    The channel rate is fixed at construction and has no setter; the sell rate is adjustable but
+    ///         capped at `MAX_SELL_BENEFIT_RATE` (5% = 50 per-mille) — reverts `ErrorSellRateTooHigh` above it,
+    ///         and `ErrorInvalidAmount(0)` for a zero rate.
+    /// @param  rate The new sell benefit rate, in per-mille (denominator 1000).
+    /// @return True on success.
     function setSellBenefitRate(uint16 rate) external returns (bool);
 
-    // 付奖兜底：用户提取此前 push 失败而记账的欠款；查询某地址的待提取兜底金额。
+    /// @notice Withdraw the caller's fallback payout that was recorded when an earlier push payment failed (GLC).
+    /// @dev    Pull payment; reverts `ErrorNoPendingPayout` when there is nothing to claim.
     function claimPayout() external;
+    /// @notice Query the pending fallback payout amount for an address.
+    /// @param  user The address to query.
+    /// @return The pending payout amount in wei (GLC).
     function pendingPayoutOf(address user) external view returns (uint256);
 
-    // 分润率只读 getter（由 PrizePoolBase 的 public 状态变量实现）；
-    // 下游通过 `is IPrizePoolBase` 即可经接口读取实时分润率，无需重复声明。
+    /// @notice The current channel benefit rate, in per-mille (denominator 1000). Fixed at construction.
+    /// @return The channel benefit rate.
     function channelBenefitRate() external view returns (uint16);
+    /// @notice The current sell benefit rate, in per-mille (denominator 1000). Adjustable via `setSellBenefitRate`.
+    /// @return The sell benefit rate.
     function sellBenefitRate() external view returns (uint16);
 
 }

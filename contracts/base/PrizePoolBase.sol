@@ -12,12 +12,15 @@ import "./AccessControlPartnerContract.sol";
 import "./NoDelegateCall.sol";
 
 /// @title PrizePoolBase
-/// @notice 抽象奖池基类：提供奖金池收款（GLC 直接转账 / 外币 mint / EIP-2612 permit）、分润计算、
-///         渠道与销售金库两段分润 pipeline 等可组合的 internal helper，以及独立的
-///         渠道 / sell 分润率治理 setter。下游通过 `is PrizePoolBase` 继承并按需组合 helper。
-/// @dev    helper 全部 internal；setter external，受 `DEFAULT_ADMIN_ROLE` 守护。
-///         渠道分润率构造期固定、无 setter（构造初值受 MAX_CHANNEL_BENEFIT_RATE 5%=50‰ 上限）；
-///         销售分润率经 setSellBenefitRate 调整、构造初值与 setter 均受 MAX_SELL_BENEFIT_RATE（5%=50‰）上限约束。
+/// @notice Abstract prize-pool base: composable internal helpers for prize-pool collection (direct GLC transfer /
+///         foreign-token mint / EIP-2612 permit), benefit computation, and the two-stage channel + sales-vault
+///         distribution pipeline, plus the sell benefit-rate governance setter. Downstreams inherit via
+///         `is PrizePoolBase` and compose the helpers as needed.
+/// @dev    Implements `IPrizePoolBase`. Helpers are all internal; the setter is external and guarded by
+///         `DEFAULT_ADMIN_ROLE`. The channel benefit rate is fixed at construction with no setter (its initial
+///         value is capped by `MAX_CHANNEL_BENEFIT_RATE`, 5% = 50 per-mille); the sell benefit rate is adjustable
+///         via `setSellBenefitRate`, with both the constructor initial value and the setter capped by
+///         `MAX_SELL_BENEFIT_RATE` (5% = 50 per-mille). Rates use denominator 1000; amounts are in wei of GLC.
 abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall, ReentrancyGuard, IPrizePoolBase {
     using SafeERC20 for ICoinBase;
 
@@ -81,8 +84,8 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         coin = ICoinBase(GreatLottoCoinAddress);
     }
 
-    /// @notice 收款（直接版）
-    /// @dev    GLC 路径：getAmount + safeTransferFrom；外币路径：coin.mint
+    /// @notice Collect payment (direct version).
+    /// @dev    GLC path: `getAmount` + `safeTransferFrom`; foreign-token path: `coin.mint`.
     function _colletWithCoin(address token, address payer, uint amount) internal returns (ICoinBase coin) {
         if (amount == 0) {
             revert ErrorInvalidAmount(0);
@@ -97,8 +100,9 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         }
     }
 
-    /// @notice 收款（permit 版）
-    /// @dev    GLC 路径：allowance 不足时先 permit，再 safeTransferFrom；外币路径：coin.mint(permit overload)
+    /// @notice Collect payment (permit version).
+    /// @dev    GLC path: if allowance is insufficient, `permit` first, then `safeTransferFrom`; foreign-token
+    ///         path: `coin.mint` (permit overload).
     function _colletWithCoin(
         address token,
         address payer,
@@ -124,8 +128,9 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         }
     }
 
-    /// @notice 严格不变量转账。amount==0 早退；前置余额检查；后置 strict equality 校验
-    ///         同时 catch silent-fail（transfer 返回 true 但未扣款）与 fee-on-transfer（多扣手续费）两类异常代币。
+    /// @notice Strict-invariant transfer. Early-returns when `amount == 0`; pre-check of balance; post-check with
+    ///         strict equality that simultaneously catches silent-fail tokens (transfer returns true but does not
+    ///         debit) and fee-on-transfer tokens (over-charge).
     function _transferTo(ICoinBase coin, address recipient, uint amount) internal {
         if (amount == 0) return;
 
@@ -139,29 +144,36 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         }
     }
 
-    /// @notice 付奖兜底：push 付款失败时按 user 记账（转 pull 模式）。
-    /// @dev    internal，供子类在 try/catch 付奖失败分支调用，避免回调 / 交易整体 revert。
+    /// @notice Payout fallback: record a debt per user when a push payment fails (switch to pull mode).
+    /// @dev    internal; called by subclasses in the try/catch failure branch of a payout to avoid reverting the
+    ///         whole callback / transaction.
     function _recordPendingPayout(address user, uint256 amount) internal {
         _pendingPayouts[user] += amount;
         _pendingPayoutTotal += amount;
         emit PayoutPending(user, GreatLottoCoinAddress, amount);
     }
 
-    /// @dev 仅供 `_softPay` 经 `this._payoutTransfer(...)` 自调用——制造独立 message-call frame 以隔离
-    ///      调用方 catch 的回滚边界：其 revert 只回滚本 frame 的转账，不回滚调用方在 `_softPay` 之前写入的
-    ///      账本扣减，从而保证「账本扣一次 + 兜底记一次」无重复计账。
-    ///      **MUST NOT** 被外部 / 内部直调（`msg.sender == address(this)` 守卫）；**不得改写为 internal**，
-    ///      否则共用同一 frame、frame 隔离失效，重复计账修正不成立。
+    /// @notice Self-call-only strict payout transfer used to isolate the soft-payment rollback boundary.
+    /// @dev    Intended ONLY for `_softPay` to invoke via `this._payoutTransfer(...)` — creating a separate
+    ///         message-call frame so its revert only rolls back this frame's transfer, not the caller's ledger
+    ///         decrement written before `_softPay`, guaranteeing "debit the ledger once + record the fallback
+    ///         once" with no double accounting. MUST NOT be called directly (external or internal) — guarded by
+    ///         `msg.sender == address(this)` (reverts `ErrorUnauthorizedSelfCall`); and MUST NOT be rewritten as
+    ///         internal, otherwise it shares the same frame, frame isolation is lost, and the double-accounting
+    ///         correction no longer holds.
+    /// @param  to     Recipient of the payout.
+    /// @param  amount Amount to transfer, in wei (GLC).
     function _payoutTransfer(address to, uint256 amount) external {
         if (msg.sender != address(this)) revert ErrorUnauthorizedSelfCall();
         _transferTo(_getCoin(), to, amount);
     }
 
-    /// @notice 软付款：push 转账失败转 pendingPayout 兜底，永不 revert（回调安全）。
-    /// @dev    经独立 frame 调 `_payoutTransfer`；任意转账失败（收款方 revert / 代币黑名单 / 余额不足 /
-    ///         后置校验失败）都被 catch，资金留存合约内并转 pull 兜底。调用方 MUST 在调用本 helper **之前**
-    ///         完成自身账本扣减（CEI），使「账本扣一次 + 兜底记一次」在 push 失败时仍配平。
-    ///         amount==0 时 `_transferTo` 早退、视为成功、不记兜底。
+    /// @notice Soft payment: on push-transfer failure, fall back to `pendingPayout`; never reverts (callback-safe).
+    /// @dev    Calls `_payoutTransfer` via a separate frame; any transfer failure (recipient revert / token
+    ///         blacklist / insufficient balance / post-check failure) is caught, funds stay in the contract and
+    ///         switch to pull fallback. The caller MUST complete its own ledger decrement BEFORE calling this
+    ///         helper (CEI), so "debit the ledger once + record the fallback once" still balances on push failure.
+    ///         When `amount == 0`, `_transferTo` early-returns, is treated as success, and records no fallback.
     function _softPay(address to, uint256 amount) internal {
         try this._payoutTransfer(to, amount) {
             // 已付
@@ -170,9 +182,10 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         }
     }
 
-    /// @notice 用户提取此前 push 失败而记账的兜底欠款（单一资产币 GLC）。
-    /// @dev    pull 支付；CEI 已先清零账本再转账，noDelegateCall 防止经 delegatecall 篡改记账上下文；
-    ///         nonReentrant 为防御纵深，令安全不再独依赖 GLC 无 transfer hook 这一治理前提。
+    /// @inheritdoc IPrizePoolBase
+    /// @dev pull payment; CEI zeroes the ledger before transferring; `noDelegateCall` prevents tampering with the
+    ///      accounting context via delegatecall; `nonReentrant` is defense-in-depth so safety no longer relies
+    ///      solely on GLC having no transfer hook.
     function claimPayout() external noDelegateCall nonReentrant {
         uint256 amount = _pendingPayouts[msg.sender];
         if (amount == 0) revert ErrorNoPendingPayout();
@@ -182,22 +195,25 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         emit PayoutClaimed(msg.sender, GreatLottoCoinAddress, amount);
     }
 
-    /// @notice 查询某地址的待提取兜底欠款金额。
+    /// @inheritdoc IPrizePoolBase
     function pendingPayoutOf(address user) external view returns (uint256) {
         return _pendingPayouts[user];
     }
 
-    /// @notice 当前滞留合约内、尚未被 claim 的兜底欠款总额（= Σ pendingPayoutOf(user)）。
-    /// @dev    供下游把软付款失败而滞留的资金纳入余额不变量（如 GreatLottoCore 的偿付能力检查）。
+    /// @notice The total fallback debt currently held in the contract and not yet claimed (= Σ pendingPayoutOf(user)).
+    /// @dev    Lets downstreams include funds stranded by failed soft payments in their balance invariants (e.g.
+    ///         GreatLottoCore's solvency check).
+    /// @return The total pending payout amount in wei (GLC).
     function pendingPayoutTotal() public view returns (uint256) {
         return _pendingPayoutTotal;
     }
 
-    /// @notice 给指定渠道分润；id 不存在（chn==address(0)）时 revert。
-    /// @dev    收款方为 SalesChannel 合约（非渠道 EOA）：先把等额 benefit 转入 SalesChannel，再调
-    ///         creditChannel 按 chnId 记账，由渠道方经 SalesChannel.withdraw 自提（pull payment）。
-    ///         转账与记账金额相等、顺序为「先转账后记账」——SalesChannel 偿付能力不变量的前提。
-    ///         benefit==0 时早退（不转账不记账）。
+    /// @notice Pay benefit to a specific channel; reverts when the id does not exist (chn == address(0)).
+    /// @dev    The recipient is the SalesChannel contract (not the channel EOA): transfer an equal `benefit` into
+    ///         SalesChannel first, then call `creditChannel` to record it per `chnId`; the channel withdraws it
+    ///         itself via `SalesChannel.withdraw` (pull payment). Transfer and credit amounts are equal, in the
+    ///         order "transfer before credit" — the precondition of SalesChannel's solvency invariant.
+    ///         Early-returns when `benefit == 0` (no transfer, no credit).
     function _channelBenefitTransfer(ICoinBase coin, uint256 benefit, uint256 chnId) internal {
         (address chn, ) = ISalesChannel(SalesChannelAddress).getChannelById(chnId);
         if (chn == address(0)) {
@@ -208,24 +224,27 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         ISalesChannel(SalesChannelAddress).creditChannel(chnId, benefit);
     }
 
-    /// @notice 给销售利润金库打款（语义化 sugar）；该转账抬高金库 totalAssets、不动 totalSupply。
+    /// @notice Pay into the sales-profit vault (semantic sugar); this transfer raises the vault's `totalAssets`
+    ///         without touching `totalSupply`.
     function _salesVaultTransfer(ICoinBase coin, uint256 benefit) internal {
         _transferTo(coin, SalesVaultAddress, benefit);
     }
 
-    /// @notice 分润计算（千分比）
+    /// @notice Benefit computation (per-mille, denominator 1000).
     function _getBenefitByRate(uint originAmount, uint16 benefitRate) internal pure returns (uint benefit, uint afterAmount) {
         benefit = originAmount * benefitRate / 1000;
         afterAmount = originAmount - benefit;
     }
 
-    /// @notice 渠道+销售金库 两段分润 pipeline
-    /// @param  coin         GLC ICoinBase 引用（由调用方 `_getCoin` 或 `_colletWithCoin` 返回）
-    /// @param  amountByCoin 用于计算分润的基数（GLC 计价）
-    /// @param  channelId    > 0 时按渠道分别打款（渠道 + sell→金库）；== 0 时合并打入金库（channel + sell 都进金库）
-    /// @return netAmount    `amountByCoin - channelBenefit - sellBenefit`，由 caller 决定净值去向
-    /// @dev    调用方需保证合约 GLC 余额足以覆盖应付分润总额；不足时 `_transferTo` 会 revert
-    ///         `ErrorInsufficientBalance`。本 helper 不 emit 单独事件，链下从 ERC20 Transfer 事件推断。
+    /// @notice Two-stage channel + sales-vault distribution pipeline.
+    /// @param  coin         GLC `ICoinBase` reference (returned by the caller's `_getCoin` or `_colletWithCoin`).
+    /// @param  amountByCoin The base amount used to compute benefits (denominated in GLC).
+    /// @param  channelId    When > 0, pay the channel separately (channel + sell -> vault); when == 0, merge into
+    ///                      the vault (both channel and sell go to the vault).
+    /// @return netAmount    `amountByCoin - channelBenefit - sellBenefit`; the caller decides where the net goes.
+    /// @dev    The caller must ensure the contract's GLC balance covers the total benefit due; otherwise
+    ///         `_transferTo` reverts `ErrorInsufficientBalance`. This helper emits no dedicated event; off-chain
+    ///         consumers infer it from the ERC20 Transfer events.
     function _distributeChannelAndSalesBenefits(
         ICoinBase coin,
         uint amountByCoin,
@@ -249,8 +268,9 @@ abstract contract PrizePoolBase is AccessControlPartnerContract, NoDelegateCall,
         netAmount = amountByCoin - channelBenefit - sellBenefit;
     }
 
-    /// @notice 治理：修改销售分润率
-    /// @dev    渠道分润率构造期固定、无 setter；销售分润率可调但受 MAX_SELL_BENEFIT_RATE（5%=50‰）硬上限约束，
+    /// @inheritdoc IPrizePoolBase
+    /// @dev The channel benefit rate is fixed at construction with no setter; the sell benefit rate is adjustable
+    ///      but capped by `MAX_SELL_BENEFIT_RATE` (5% = 50 per-mille), and a zero rate reverts `ErrorInvalidAmount(0)`.
     function setSellBenefitRate(uint16 rate) external virtual onlyRole(DEFAULT_ADMIN_ROLE) returns (bool) {
         if (rate == 0) {
             revert ErrorInvalidAmount(0);

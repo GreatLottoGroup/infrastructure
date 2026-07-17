@@ -11,6 +11,11 @@ optimizer = true
 optimizer_runs = 200
 fs_permissions = [{ access = "read", path = "./" }]
 
+[doc]
+out = "docs"
+title = "Infrastructure Contracts"
+ignore = ["contracts/mocks/*.sol", "contracts/libraries/*.sol", "contracts/test/*.sol"]
+
 [profile.default.fuzz]
 runs = 256
 

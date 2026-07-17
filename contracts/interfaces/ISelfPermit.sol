@@ -7,6 +7,7 @@ interface ISelfPermit {
 
     /// @notice Permits this contract to spend a given token from `msg.sender`
     /// @dev The `owner` is always msg.sender and the `spender` is always address(this).
+    /// @param owner The token holder granting the approval (expected to be `msg.sender`)
     /// @param token The address of the token spent
     /// @param value The amount that can be spent of token
     /// @param deadline A timestamp, the current blocktime must be less than or equal to this timestamp
@@ -26,6 +27,7 @@ interface ISelfPermit {
     /// @notice Permits this contract to spend a given token from `msg.sender`
     /// @dev The `owner` is always msg.sender and the `spender` is always address(this).
     /// Can be used instead of #selfPermit to prevent calls from failing due to a frontrun of a call to #selfPermit
+    /// @param owner The token holder granting the approval (expected to be `msg.sender`)
     /// @param token The address of the token spent
     /// @param value The amount that can be spent of token
     /// @param deadline A timestamp, the current blocktime must be less than or equal to this timestamp

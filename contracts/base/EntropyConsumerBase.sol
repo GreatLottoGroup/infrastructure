@@ -10,6 +10,12 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {DeadLine} from "./DeadLine.sol";
 import {IEntropyConsumerBase} from "../interfaces/IEntropyConsumerBase.sol";
 
+/// @title EntropyConsumerBase
+/// @notice Abstract base for asynchronous Pyth Entropy V2 consumers: submits randomness requests, handles the
+///         provider callback, supports retrying stalled requests, and exposes provider / gas / timeout governance.
+/// @dev    Implements `IEntropyConsumerBase`. Randomness is two-phase (request then callback). Downstreams
+///         inherit this base and implement the `_onRequestFulfilled` hook. Entropy fees are paid in wei
+///         (native gas token); the timeout is in seconds.
 abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLine, ReentrancyGuard, IEntropyConsumerBase {
     uint64 public constant MIN_ENTROPY_TIMEOUT = 60;
     uint64 public constant MAX_ENTROPY_TIMEOUT = 24 hours;
@@ -38,10 +44,12 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         return address(entropy);
     }
 
+    /// @inheritdoc IEntropyConsumerBase
     function entropyFee() public view returns (uint256) {
         return entropy.getFeeV2(entropyProvider, callbackGasLimit);
     }
 
+    /// @inheritdoc IEntropyConsumerBase
     function getRequest(uint64 sequenceNumber) external view returns (Request memory) {
         return _request[sequenceNumber];
     }
@@ -76,10 +84,10 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         _refundFee(requester, paid - fee);
     }
 
-    /// @dev 子类可在 base 退余款（让出控制权）前继续写业务 storage / emit
+    /// @dev Subclasses may write business storage / emit here, before the base refunds the surplus (yields control).
     function _postRequest(uint64 /*sequenceNumber*/, Request memory /*req*/) internal virtual {}
 
-    /// @dev 退还超付的 entropy fee；amount 为 0 时直接跳过（无差额无需转账）
+    /// @dev Refund the overpaid entropy fee; skips entirely when `amount` is 0 (no surplus, no transfer needed).
     function _refundFee(address to, uint256 amount) internal {
         if (amount == 0) return;
         (bool ok, ) = payable(to).call{value: amount}("");
@@ -94,6 +102,7 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         emit RequestFulfilled(sequenceNumber, req.requester, req.tokenId);
     }
 
+    /// @inheritdoc IEntropyConsumerBase
     function retryRequest(
         uint64 oldSequenceNumber,
         bytes32 newUserRandomNumber,
@@ -104,9 +113,10 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
         if (old.requester != msg.sender) revert ErrorNotRequester();
         if (newUserRandomNumber == bytes32(0)) revert ErrorInvalidUserRandom();
 
-        // 重试放行条件：超时(timedOut) 或 Pyth 回调失败(callbackFailed)，二者满足其一即可。
-        // 若两者都不满足，说明请求仍在正常 in-flight（等待回调），禁止重试 → revert。
-        // 优化：已超时时无需再查链上状态，故仅在「未超时」时才花一次外部 call 查 Pyth 回调状态。
+        // Retry is allowed when EITHER the request has timed out OR its Pyth callback has failed.
+        // If neither holds, the request is still normally in-flight (awaiting callback), so retry is forbidden -> revert.
+        // Optimization: once timed out there is no need to query on-chain status, so only when NOT timed out do we
+        // spend one external call to read the Pyth callback status.
         bool timedOut = block.timestamp >= uint256(old.requestedAt) + uint256(entropyTimeout);
         bool callbackFailed = false;
         if (!timedOut) {
@@ -143,7 +153,8 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
 
     function _beforeRetry(uint64 /*oldSequenceNumber*/, Request memory /*old*/) internal virtual {}
 
-    /// @dev 子类可在 base 退余款前同步业务状态（例如把 NFT 的 sequenceNumber 切到 newSeq）
+    /// @dev Subclasses may sync business state before the base refunds the surplus (e.g. move the NFT's
+    ///      sequenceNumber to newSeq).
     function _postRetry(
         uint64 /*oldSequenceNumber*/,
         uint64 /*newSequenceNumber*/,
@@ -152,18 +163,21 @@ abstract contract EntropyConsumerBase is IEntropyConsumer, AccessControl, DeadLi
 
     function _onRequestFulfilled(uint64 sequenceNumber, Request memory req, bytes32 randomNumber) internal virtual;
 
+    /// @inheritdoc IEntropyConsumerBase
     function setEntropyProvider(address newProvider) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newProvider == address(0)) revert ErrorZeroAddress();
         emit EntropyProviderChanged(entropyProvider, newProvider);
         entropyProvider = newProvider;
     }
 
+    /// @inheritdoc IEntropyConsumerBase
     function setCallbackGasLimit(uint32 newLimit) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newLimit < MIN_CALLBACK_GAS || newLimit > MAX_CALLBACK_GAS) revert ErrorInvalidCallbackGasLimit();
         emit CallbackGasLimitChanged(callbackGasLimit, newLimit);
         callbackGasLimit = newLimit;
     }
 
+    /// @inheritdoc IEntropyConsumerBase
     function setEntropyTimeout(uint64 newTimeout) external virtual onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newTimeout < MIN_ENTROPY_TIMEOUT || newTimeout > MAX_ENTROPY_TIMEOUT) revert ErrorInvalidEntropyTimeout();
         emit EntropyTimeoutChanged(entropyTimeout, newTimeout);

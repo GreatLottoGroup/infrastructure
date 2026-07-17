@@ -14,7 +14,11 @@ import "./base/SelfPermit.sol";
 import "./base/NoDelegateCall.sol";
 import "./base/AccessControlPartnerContract.sol";
 
-// 奖池币
+/// @title GreatLottoCoin
+/// @notice The GreatLottoCoin (GLC) prize-pool currency: an 18-decimal ERC20 wrapper minted 1:1 (in whole
+///         units) against a whitelist of underlying stablecoins, with EIP-2612 permit support.
+/// @dev    Implements `IGreatLottoCoin` / `ICoinBase`. Minting is gated to `PARTNER_CONTRACT_ROLE` (the prize
+///         pool contract); `withdraw` burns GLC for the underlying; `recover` (owner) sweeps surplus underlying.
 contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract, NoDelegateCall, ReentrancyGuard, IGreatLottoCoin{
 
     using SafeERC20 for IERC20;
@@ -29,13 +33,13 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
         _tokens = tokensAddress_;
     }
 
-    // 需要校验只有主合约才能调用
+    /// @inheritdoc ICoinBase
     function mint(address token, uint256 amount, address payer) external virtual noDelegateCall onlyRole(PARTNER_CONTRACT_ROLE) returns (bool){
         _depositFor(token, amount, payer, _msgSender());
         return true;
     }
-    
-    // 签名铸造
+
+    /// @inheritdoc ICoinBase
     function mint(address token, uint256 amount, address payer, uint deadline, uint8 v, bytes32 r, bytes32 s) external noDelegateCall onlyRole(PARTNER_CONTRACT_ROLE) returns (bool){
         selfPermitIfNecessary(payer, token, getAmount(token, amount), deadline, v, r, s);
         _depositFor(token, amount, payer, _msgSender());
@@ -69,9 +73,8 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
 
     }
 
-    /**
-     * @dev Allow a user to burn a number of wrapped tokens and withdraw the corresponding number of underlying tokens.
-     */
+    /// @inheritdoc ICoinBase
+    /// @dev Allow a user to burn a number of wrapped tokens and withdraw the corresponding number of underlying tokens.
     function withdraw(address token, uint256 amount) external noDelegateCall nonReentrant returns (bool) {
 
         address recipient = _msgSender();
@@ -108,11 +111,9 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
         return true;
     }
 
-    /**
-     * @dev Mint wrapped token to cover any underlyingTokens that would have been transferred by mistake. Internal
-     * function that can be exposed with access control if desired.
-     */
-    // 只限owner调用
+    /// @inheritdoc ICoinBase
+    /// @dev Mints wrapped token to cover any underlying tokens transferred in by mistake (surplus beyond
+    ///      totalSupply). Owner-only (`DEFAULT_ADMIN_ROLE`).
     function recover() public noDelegateCall onlyRole(DEFAULT_ADMIN_ROLE) returns (uint256 value) {
  
         uint256 totalBalance = 0;
@@ -136,6 +137,7 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
 
     }
 
+    /// @inheritdoc ICoinBase
     function getAmount(uint amount) public view returns (uint) {
         return amount * 10 ** decimals();
     }
@@ -148,6 +150,7 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
         return amount * 10 ** (decimals() - IERC20Metadata(token).decimals());
     }
     
+    /// @inheritdoc ICoinBase
     function checkToken(address token) public view returns (bool result){
         result = false;
         for(uint8 i; i < _tokens.length; i++){
@@ -165,6 +168,7 @@ contract GreatLottoCoin is ERC20Permit, SelfPermit, AccessControlPartnerContract
         return super.nonces(owner);
     }
 
+    /// @inheritdoc ICoinBase
     function version() public view returns (string memory) {
         return _EIP712Version();
     }

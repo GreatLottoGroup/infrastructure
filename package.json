@@ -7,6 +7,9 @@
     "test": "forge test",
     "gas": "forge test --gas-report",
     "coverage": "forge coverage --report summary",
+    "docs": "forge doc",
+    "docs:serve": "forge doc --serve --port 4000",
+    "docs:lint": "forge build --ast --force && node tools/check-natspec.mjs",
     "test:scripts": "node --test \"skills/**/test/**/*.test.mjs\"",
     "compile": "hardhat compile"
   },
