@@ -14,7 +14,8 @@ description: 在 GreatLottoGroup 4 仓工作区做本地一键部署(起 hardhat
 |------|------|
 | `deploy.config.json` | 网络注册表 + 地址映射(加链/加合约只改这里) |
 | `sync-core.mjs` | 纯函数核心(单测覆盖) |
-| `sync-addresses.mjs` | 地址同步 CLI |
+| `sync-addresses.mjs` | 地址同步 CLI(→ sc/core 参数 + interface,含 entropy) |
+| `sync-deploy-params.mjs` | 专用 CLI:infra 地址 → sc/core 部署参数(部署 sc/core 前用,不碰 interface) |
 | `sync-abi.mjs` | ABI 同步 CLI(三仓 artifact → interface) |
 | `abi-core.mjs` | ABI 纯函数核心(单测覆盖) |
 | `abi.config.json` | ABI 映射(加/改合约 abi 改这里) |
@@ -79,6 +80,31 @@ node skills/deploy-local-and-sync/sync-abi.mjs --network base --write
 - `--network` 可选,默认 `localhost`,**仅影响带变体的 mapping(目前只有 `GreatLottoCoin`)**;其余合约 ABI 与网络无关。
 - 前置:对应仓已 `npx hardhat compile`(artifact 缺失会告警并跳过该文件)。`deploy-local.sh` 里 `ignition deploy` 已隐式编译,故一键流程无需额外编译。
 - **孤儿告警**:abi 目录里既不在 `abi.config.json` 映射、又不在 `external` 白名单的文件(历史死件,如 `Callable.json`)会被列出,**只报告不删**。
+
+## 场景 4 —— infra 部署后:为 sc/core 准备部署参数
+
+刚把 `infrastructure` 部署到某条链(测试网 / 主网),准备接着部署 `ScratchCard` / `GreatLottoCore` 前用。
+把 infra 新部署的三个地址(`greatLottoCoinAddress` / `salesVaultAddress` / `salesChannelAddress`)回填进
+这两仓的 `ignition/parameters/<net>.json`,否则它们部署时构造函数会因零地址 revert。
+
+```bash
+cd infrastructure
+
+# dry-run(默认):只打印 sc/core 两仓参数的 diff,不写
+node skills/deploy-local-and-sync/sync-deploy-params.mjs --network baseSepolia
+
+# 落盘:非本地网络先要求交互输入 yes 确认
+node skills/deploy-local-and-sync/sync-deploy-params.mjs --network baseSepolia --write
+
+# CI / 跳过确认
+node skills/deploy-local-and-sync/sync-deploy-params.mjs --network baseSepolia --write --yes
+```
+
+- **只读** infra 部署产物、**只写** ScratchCard + GreatLottoCore 两个参数文件,**绝不触碰 interface `address.json`**。
+- sc/core 尚未部署该链也能跑(只填入参);不覆盖已有非零地址;非本地网络有 `yes` 写入闸门(`--yes` 跳过)。
+- sc/core 的 `owner` / `entropyAddress` / `entropyProvider` 不来自 infra,本脚本不动(手工 / Pyth 官方值)。
+- **与场景 2/3 的区别**:场景 2/3 是把已部署地址同步给**前端 interface**;本场景是为**部署下游合约**备好入参。
+- 典型部署顺序:`部署 infra → 本脚本回填 sc/core 参数 → 分别 ignition deploy sc/core → (可选)场景 2 sync-addresses 同步给 interface`。
 
 ## 加 / 改一个合约 ABI
 

@@ -7,6 +7,7 @@ import {
   parseArgs, resolveNetwork, isEmptyAddr,
   resolveContractAddresses, resolveEntropy,
   buildDiffs, applyDiffs, formatDiffs, getPath,
+  filterMappingsBySource,
 } from "../sync-core.mjs";
 
 const REAL_CONFIG = JSON.parse(
@@ -124,6 +125,49 @@ test("buildDiffs: --only 过滤目的地", () => {
   };
   const diffs = buildDiffs({ config: CONFIG, network: net, resolved, entropy: null, targets, only: ["sc"] });
   assert.ok(diffs.every((d) => d.scope === "sc"));
+});
+
+test("filterMappingsBySource: 只保留指定 source 的映射", () => {
+  const cfg = filterMappingsBySource(CONFIG, "infrastructure");
+  assert.ok(cfg.mappings.length >= 1);
+  assert.ok(cfg.mappings.every((m) => m.source === "infrastructure"));
+  assert.ok(cfg.mappings.some((m) => m.logical === "GreatLottoCoin"));
+  assert.ok(!cfg.mappings.some((m) => m.logical === "ScratchCard"));
+  // 浅拷贝:原 config 不受影响
+  assert.ok(CONFIG.mappings.some((m) => m.source === "scratchcard"));
+});
+
+// sync-deploy-params.mjs 的核心组合:infra-only config + only sc,core + entropy=null。
+// 用真实 deploy.config.json,确认只写 sc/core 参数、不碰 interface、下游未部署也不产出无关告警。
+test("deploy-params 组合:infra-only 只产出 sc/core diff,无 interface,无下游告警", () => {
+  const cfg = filterMappingsBySource(REAL_CONFIG, "infrastructure");
+  const net = resolveNetwork(REAL_CONFIG, "localhost");
+  const deployedByRepo = {
+    infrastructure: {
+      "Infrastructure#GreatLottoCoinTest": "0xCoin",
+      "Infrastructure#SalesVault": "0xVault",
+      "Infrastructure#SalesChannel": "0xChan",
+    },
+  };
+  const { resolved, warnings } = resolveContractAddresses(cfg, net, deployedByRepo);
+  // 三个 infra 合约全解析,且没有 ScratchCard/GreatLotto 之类下游告警
+  assert.equal(resolved.GreatLottoCoin, "0xCoin");
+  assert.equal(resolved.SalesVault, "0xVault");
+  assert.equal(resolved.SalesChannel, "0xChan");
+  assert.equal(warnings.length, 0);
+
+  const targets = {
+    scParam: { [net.scModule]: {} },
+    core: { [net.coreModule]: {} },
+  };
+  const diffs = buildDiffs({
+    config: cfg, network: net, resolved, entropy: null, targets, only: ["sc", "core"],
+  });
+  assert.ok(diffs.length > 0);
+  assert.ok(diffs.every((d) => d.scope === "sc" || d.scope === "core"));
+  assert.ok(diffs.some((d) => d.scope === "sc"));
+  assert.ok(diffs.some((d) => d.scope === "core"));
+  assert.ok(!diffs.some((d) => d.label.includes("interface")));
 });
 
 test("applyDiffs: 按 scope+path 写回,保留其它 key", () => {

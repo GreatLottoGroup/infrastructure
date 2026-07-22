@@ -27,6 +27,11 @@ export function resolveNetwork(config, arg) {
   throw new Error(`未知网络: ${arg}`);
 }
 
+// 返回一个只保留指定 source 映射的 config 浅拷贝(用于「只同步某来源合约」的专用流程,如 infra→下游部署参数)。
+export function filterMappingsBySource(config, source) {
+  return { ...config, mappings: config.mappings.filter((m) => m.source === source) };
+}
+
 export function resolveContractAddresses(config, network, deployedByRepo) {
   const resolved = {};
   const warnings = [];
