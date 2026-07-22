@@ -52,13 +52,17 @@ npm run docs:lint   # forge build --ast --force + 零依赖 tools/check-natspec.
 # 部署到本地（先 `anvil` 或 `npx hardhat node`）
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network localhost --parameters ignition/parameters/localhost.json
 
-# 测试网（首发链 Base / Arbitrum，见 hardhat.config.js networks）
+# 测试网（Base / Arbitrum / Optimism / Unichain，见 hardhat.config.js networks）
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network baseSepolia --parameters ignition/parameters/baseSepolia.json --reset --verify
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrumSepolia --parameters ignition/parameters/arbitrumSepolia.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network optimismSepolia --parameters ignition/parameters/optimismSepolia.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network unichainSepolia --parameters ignition/parameters/unichainSepolia.json --reset --verify
 
 # 主网（生产前需将 ignition 模块改为部署 GreatLottoCoin 而非 GreatLottoCoinTest）
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network base --parameters ignition/parameters/base.json --reset --verify
 npx hardhat ignition deploy ignition/modules/infrastructure.js --network arbitrum --parameters ignition/parameters/arbitrum.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network optimism --parameters ignition/parameters/optimism.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js --network unichain --parameters ignition/parameters/unichain.json --reset --verify
 ```
 
 ### 本地一键部署 + 跨仓同步（skill `deploy-local-and-sync`）
@@ -84,7 +88,7 @@ node skills/deploy-local-and-sync/sync-abi.mjs [--network <net>] [--write]
 
 - `ALCHEMY_API_KEY` — Alchemy API Key，用于所有 RPC 节点及默认 hardhat 分叉
 - `DEPLOY_ACCOUNT_PRIVATE_KEY` — 部署账户私钥
-- `ETHERSCAN_API_KEY` — Etherscan V2 统一 API，一把 etherscan.io key 通吃 Base / Arbitrum 全链合约验证（旧的 `BASESCAN_API_KEY` / `ARBISCAN_API_KEY` 已停用）
+- `ETHERSCAN_API_KEY` — Etherscan V2 统一 API，一把 etherscan.io key 通吃 Base / Arbitrum / Optimism / Unichain 全链合约验证（旧的 `BASESCAN_API_KEY` / `ARBISCAN_API_KEY` 已停用）
 
 ## 架构说明
 

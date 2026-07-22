@@ -3,12 +3,50 @@ require("@nomicfoundation/hardhat-toolbox");
 require('hardhat-contract-sizer');
 require('dotenv').config()
 require("@nomicfoundation/hardhat-ignition-ethers");
+const { extendProvider } = require("hardhat/config");
+const { ProviderWrapper } = require("hardhat/plugins");
 
 task("accounts", "Prints the list of accounts", async () => {
   const accounts = await ethers.getSigners();
   for (const account of accounts) {
     console.log(account.address);
   }
+});
+
+// ── OP-Stack EIP-7825 estimateGas 修复 ────────────────────────────────────────
+// Karst 硬分叉在 OP 系链（Optimism / Base / Unichain）激活 EIP-7825：单笔交易 gas
+// 上限 2^24 = 16,777,216。但 op 节点(op-geth/op-reth)在**无 gas 字段**的 eth_estimateGas
+// 路径仍以「区块 gas limit(~40M)」为二分上界，>2^24 → 节点直接回 `intrinsic gas too high`
+// （见 ethereum-optimism/optimism#21457、paradigmxyz/reth#25469，属节点侧 bug）。
+// Ignition 恰好总是发**无 gas** 的 eth_estimateGas（jsonrpc-client 里 gas 字段恒 undefined，
+// 且 Ignition 无「固定 gasLimit」配置项可绕过）→ 部署 IGN410: Gas estimation failed。
+// 修法：包一层 provider，对无 gas 的 eth_estimateGas 注入 gas=2^24-1（≤ cap），节点即改以
+// 该值为二分上界返回真实估算；部署合约远低于 16.77M，天花板足够。仅 OP 系链启用（Arbitrum
+// gas 语义含 L1 calldata、估值可超此值，绝不能套此上界）。真实广播不受影响、无需改动。
+const EIP7825_ESTIMATE_GAS_CAP = "0xffffff"; // 16,777,215 = 2^24 - 1
+const OP_STACK_NETWORKS = new Set([
+  "optimism", "optimismSepolia",
+  "base", "baseSepolia",
+  "unichain", "unichainSepolia",
+]);
+
+class OpStackEstimateGasProvider extends ProviderWrapper {
+  async request(args) {
+    if (
+      args.method === "eth_estimateGas" &&
+      Array.isArray(args.params) &&
+      args.params[0] != null &&
+      args.params[0].gas === undefined
+    ) {
+      args.params[0] = { ...args.params[0], gas: EIP7825_ESTIMATE_GAS_CAP };
+    }
+    return this._wrappedProvider.request(args);
+  }
+}
+
+extendProvider(async (provider, _config, network) => {
+  if (!OP_STACK_NETWORKS.has(network)) return provider;
+  return new OpStackEstimateGasProvider(provider);
 });
 
 
@@ -69,6 +107,26 @@ module.exports = {
         url: `https://arb-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
         chainId: 421614,
         accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
+    },
+    optimism: {
+        url: `https://opt-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 10,
+        accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
+    },
+    optimismSepolia: {
+        url: `https://opt-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 11155420,
+        accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
+    },
+    unichain: {
+        url: `https://unichain-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 130,
+        accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
+    },
+    unichainSepolia: {
+        url: `https://unichain-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        chainId: 1301,
+        accounts: [process.env.DEPLOY_ACCOUNT_PRIVATE_KEY],
     }
   },
 
@@ -90,6 +148,8 @@ module.exports = {
     // resolveChainConfig 是 [...customChains, ...builtinChains].find()，故在此补一条即可。
     // V2 单串 key 下 Etherscan 类会把 apiURL 覆盖成统一端点 https://api.etherscan.io/v2/api
     // 并附 ?chainid=84532 路由，故下方 apiURL 仅占位、browserURL 用于成功回显链接。
+    // OP(10)/OP Sepolia(11155420)/Unichain(130)/Unichain Sepolia(1301) 同理均不在 ignition-core
+    // 过时 builtinChains 内，故一并补 customChains 防 --verify 抛 IGN1002。
     customChains: [
       {
         network: "baseSepolia",
@@ -97,6 +157,38 @@ module.exports = {
         urls: {
           apiURL: "https://api-sepolia.basescan.org/api",
           browserURL: "https://sepolia.basescan.org",
+        },
+      },
+      {
+        network: "optimism",
+        chainId: 10,
+        urls: {
+          apiURL: "https://api-optimistic.etherscan.io/api",
+          browserURL: "https://optimistic.etherscan.io",
+        },
+      },
+      {
+        network: "optimismSepolia",
+        chainId: 11155420,
+        urls: {
+          apiURL: "https://api-sepolia-optimistic.etherscan.io/api",
+          browserURL: "https://sepolia-optimism.etherscan.io",
+        },
+      },
+      {
+        network: "unichain",
+        chainId: 130,
+        urls: {
+          apiURL: "https://api.uniscan.xyz/api",
+          browserURL: "https://uniscan.xyz",
+        },
+      },
+      {
+        network: "unichainSepolia",
+        chainId: 1301,
+        urls: {
+          apiURL: "https://api-sepolia.uniscan.xyz/api",
+          browserURL: "https://sepolia.uniscan.xyz",
         },
       },
     ],

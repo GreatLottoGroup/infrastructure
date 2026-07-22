@@ -4,7 +4,11 @@
     "baseSepolia":     { "chainId": 84532,  "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
     "arbitrumSepolia": { "chainId": 421614, "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
     "base":            { "chainId": 8453,   "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
-    "arbitrum":        { "chainId": 42161,  "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false }
+    "arbitrum":        { "chainId": 42161,  "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
+    "optimismSepolia": { "chainId": 11155420, "scModule": "ScratchCardModule",    "coreModule": "GreatLottoCore",      "local": false },
+    "unichainSepolia": { "chainId": 1301,  "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
+    "optimism":        { "chainId": 10,     "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false },
+    "unichain":        { "chainId": 130,    "scModule": "ScratchCardModule",      "coreModule": "GreatLottoCore",      "local": false }
   },
   "repos": {
     "infrastructure": "infrastructure",

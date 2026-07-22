@@ -36,7 +36,7 @@
 
 ## 1. Abstract
 
-GreatLottoGroup is an on-chain gaming/lottery platform built on Ethereum L2s (initially launching on Base and Arbitrum One). The **infrastructure contract layer** provides three reusable foundational capabilities for the platform:
+GreatLottoGroup is an on-chain gaming/lottery platform built on Ethereum L2s (Base, Arbitrum One, Optimism, and Unichain). The **infrastructure contract layer** provides three reusable foundational capabilities for the platform:
 
 - **Asset settlement coin (GreatLottoCoin, GLC)**: wraps external stablecoins (currently USDC) 1:1 by value into a unified platform accounting unit, shields business contracts from stablecoin differences, and constrains issuance with a "full collateralization" invariant;
 - **Channel benefit escrow (SalesChannel)**: channels self-register on-chain, the platform escrows each channel's due revenue-share into the ledger, channels self-withdraw under a pull-payment model, and the ledger satisfies a strict solvency invariant;

@@ -21,12 +21,20 @@ npx hardhat ignition deploy ignition/modules/infrastructure.js \
   --network baseSepolia --parameters ignition/parameters/baseSepolia.json --reset --verify
 npx hardhat ignition deploy ignition/modules/infrastructure.js \
   --network arbitrumSepolia --parameters ignition/parameters/arbitrumSepolia.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js \
+  --network optimismSepolia --parameters ignition/parameters/optimismSepolia.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js \
+  --network unichainSepolia --parameters ignition/parameters/unichainSepolia.json --reset --verify
 
 # 主网
 npx hardhat ignition deploy ignition/modules/infrastructure.js \
   --network base --parameters ignition/parameters/base.json --reset --verify
 npx hardhat ignition deploy ignition/modules/infrastructure.js \
   --network arbitrum --parameters ignition/parameters/arbitrum.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js \
+  --network optimism --parameters ignition/parameters/optimism.json --reset --verify
+npx hardhat ignition deploy ignition/modules/infrastructure.js \
+  --network unichain --parameters ignition/parameters/unichain.json --reset --verify
 ```
 
 ## 校对清单

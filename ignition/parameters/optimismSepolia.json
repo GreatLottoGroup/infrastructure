@@ -1,0 +1,8 @@
+{
+  "Infrastructure": {
+    "owner": "0xC691F40E4c6eF5B44FA654AB1b5D4e33c880f174",
+    "supportedTokens": [
+        "0x5fd84259d66Cd46123540766Be93DFE6D43130D7"
+    ]
+  }
+}

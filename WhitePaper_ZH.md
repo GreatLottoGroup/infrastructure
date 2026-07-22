@@ -36,7 +36,7 @@
 
 ## 1. 摘要
 
-GreatLottoGroup 是一套构建在以太坊 L2（首发 Base 与 Arbitrum One）上的链上博彩平台。**基础设施合约层**为平台提供三块可复用的底座能力：
+GreatLottoGroup 是一套构建在以太坊 L2（Base、Arbitrum One、Optimism 与 Unichain）上的链上博彩平台。**基础设施合约层**为平台提供三块可复用的底座能力：
 
 - **资产结算币（GreatLottoCoin，GLC）**：把外部稳定币（当前为 USDC）按 1:1 价值封装为平台统一记账单位，屏蔽稳定币差异、并以「足额抵押」不变量约束其发行；
 - **销售渠道分润托管（SalesChannel）**：渠道方链上自助注册，平台把渠道应得分润托管入账，渠道方按 pull-payment 模式自提，账本满足严格偿付能力不变量；
