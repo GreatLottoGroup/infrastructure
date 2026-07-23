@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.36;
 
 import {BaseTest} from "./base/BaseTest.sol";
 import {MockEntropyWithFee} from "./mocks/MockEntropyWithFee.sol";

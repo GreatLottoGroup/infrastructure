@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.36;
 
 import {EntropyConsumerBase} from "../../../contracts/base/EntropyConsumerBase.sol";
 

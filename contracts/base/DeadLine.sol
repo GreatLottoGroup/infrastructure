@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.36;
 
 /// @title DeadLine
 /// @notice Base contract providing a `checkDeadline` modifier that reverts once a transaction's deadline has passed.

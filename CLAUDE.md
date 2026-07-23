@@ -92,7 +92,7 @@ node skills/deploy-local-and-sync/sync-abi.mjs [--network <net>] [--write]
 
 ## 架构说明
 
-本项目使用 Hardhat + Solidity 0.8.26 + OpenZeppelin，为 GreatLottoGroup 彩票平台提供底层代币基础设施。
+本项目使用 Hardhat + Solidity 0.8.36 + OpenZeppelin，为 GreatLottoGroup 彩票平台提供底层代币基础设施。
 
 ### 核心合约
 

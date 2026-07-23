@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.36;
 
 // Foundry test harness: exposes PrizePoolBase internal helpers as external wrappers.
 // MUST NOT be deployed to production networks.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.36;
 
 // Hardhat-only mock: fee-on-transfer ERC20. Each transfer burns a fixed fee from the sender's send,
 // so the recipient receives less than `amount` and the sender pays an extra `fee` beyond `amount`.

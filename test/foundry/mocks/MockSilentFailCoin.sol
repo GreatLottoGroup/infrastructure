@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.36;
 
 // Hardhat-only mock: ERC20-compatible surface where transfer returns true but never moves balances.
 // Used to exercise PrizePoolBase._transferTo silent-fail revert path.

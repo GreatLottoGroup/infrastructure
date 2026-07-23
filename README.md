@@ -1,6 +1,6 @@
 # Infrastructure
 
-GreatLottoGroup 平台的底层代币基础设施合约（Solidity 0.8.26 + OpenZeppelin v5）。
+GreatLottoGroup 平台的底层代币基础设施合约（Solidity 0.8.36 + OpenZeppelin v5）。
 
 > **工具链分工**：**测试用 Foundry**（`forge test`，含 fuzz/invariant）；**Hardhat 只管部署（Ignition）与 ABI 产出**。
 

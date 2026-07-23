@@ -55,7 +55,7 @@ module.exports = {
   defaultNetwork: "hardhat",
   
   solidity: {
-    version: "0.8.26",
+    version: "0.8.36",
     settings: {
       evmVersion: "cancun",
       viaIR: true,

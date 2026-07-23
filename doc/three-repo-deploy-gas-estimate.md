@@ -15,7 +15,7 @@
   - `ScratchCard/ignition/modules/ScratchCard.js`
 - infra 合约按依赖顺序用真实地址部署（GLC → SalesVault → SalesChannel，因 SalesVault 是 ERC4626 构造期读 asset decimals）；Core / ScratchCard 的外部依赖（GLC / SalesVault / SalesChannel / Pyth entropy / provider）用占位非零地址——这些地址在构造期仅被存为 immutable、不发生外部调用，不影响部署 gas。
 - ETH 换算：`gasUsed × 0.02 Gwei = gasUsed × 0.02 × 10⁻⁹ ETH`。
-- 编译口径：solc 0.8.26、viaIR、optimizer runs=200（三仓一致）。
+- 编译口径：solc 0.8.36、viaIR、optimizer runs=200（三仓一致）。
 
 ---
 
